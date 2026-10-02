@@ -2,6 +2,8 @@
 
 > Captures system audio or a specific app, recognizes the song via Shazam (free, no key).
 >
+> **Support:** Windows ✅ · Linux / macOS ⚠️ untested — reports welcome.
+>
 > English | [العربية](README_ar.md)
 
 ## Features
