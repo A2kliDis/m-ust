@@ -20,6 +20,7 @@ pub struct SongInfo {
     pub artist: String,
     pub album: Option<String>,
     pub url: Option<String>,
+    pub cover_url: Option<String>,
 }
 
 pub struct App {
@@ -126,13 +127,13 @@ impl App {
             let res: Result<SongInfo, String> = match capture.record().await {
                 Ok(audio) => {
                     let sig = generate_shazam_signature(&audio.samples);
-                    match recognize_with_shazam(&sig).await {
-                        Ok(r) => Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url}),
+                                        match recognize_with_shazam(&sig).await {
+                                            Ok(r) => Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url, cover_url:r.cover_url}),
                         Err(e) => {
                             let msg = e.to_string();
                             if let Some(key) = cfg.acoustid_api_key.clone() {
                                 match recognize_with_acoustid(&audio.samples, 16000, &key).await {
-                                    Ok(ac) => Ok(SongInfo{title:ac.title, artist:ac.artist, album:ac.album, url:None}),
+                                                        Ok(ac) => Ok(SongInfo{title:ac.title, artist:ac.artist, album:ac.album, url:None, cover_url:None}),
                                     Err(ae) => Err(if msg.contains("matches") { format!("Song not recognized (Shazam+AcoustID). {} — install fpcalc or try louder volume", ae) } else { format!("Shazam: {} | AcoustID: {}", e, ae)}),
                                 }
                             } else {
@@ -164,6 +165,21 @@ impl App {
     }
     #[cfg(not(target_os = "windows"))]
     fn update_peaks(&mut self) {}
+}
+
+fn open_in_browser(url: &str) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+    }
 }
 
 fn parse_pid(s: &str) -> Option<u32> {
@@ -226,6 +242,17 @@ pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
                                 for e in app.history[start..].to_vec() {
                                     app.push_log(format!("{} — {} - {}", e.timestamp, e.artist, e.title));
                                 }
+                            }
+                        },
+                        KeyCode::Char('o') | KeyCode::Char('O') => {
+                            let target = app.result.as_ref()
+                                .and_then(|s| s.cover_url.clone().or_else(|| s.url.clone()));
+                            match target {
+                                Some(link) => {
+                                    open_in_browser(&link);
+                                    app.push_log(format!("Opened: {}", link));
+                                }
+                                None => app.push_log("No result to open yet — press r first".to_string()),
                             }
                         },
                         KeyCode::Tab => {

@@ -8,6 +8,7 @@ pub struct ShazamResult {
     pub artist: String,
     pub album: Option<String>,
     pub url: Option<String>,
+    pub cover_url: Option<String>,
     pub raw: Value,
 }
 
@@ -81,5 +82,10 @@ fn parse_track(track: &Value, raw: Value) -> Result<ShazamResult> {
         .and_then(|m| m.get("text").and_then(|t| t.as_str())).map(|s| s.to_string());
     let url = track.get("url").and_then(|v| v.as_str()).map(|s| s.to_string())
         .or_else(|| track.get("share").and_then(|s| s.get("href")).and_then(|h| h.as_str()).map(|s| s.to_string()));
-    Ok(ShazamResult { title, artist, album, url, raw })
+    // Cover art: prefer high-quality, fall back to standard then share image
+    let cover_url = track.get("images").and_then(|i| i.get("coverarthq")).and_then(|v| v.as_str())
+        .or_else(|| track.get("images").and_then(|i| i.get("coverart")).and_then(|v| v.as_str()))
+        .or_else(|| track.get("share").and_then(|s| s.get("image")).and_then(|h| h.as_str()))
+        .map(|s| s.to_string());
+    Ok(ShazamResult { title, artist, album, url, cover_url, raw })
 }

@@ -68,13 +68,17 @@ pub fn draw(f: &mut Frame, app: &App) {
     // Content
     let content = chunks[3];
     if let Some(song) = &app.result {
-        let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result ");
-        let lines = vec![
+        let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open) ");
+        let mut lines = vec![
             Line::from(vec![Span::styled(&song.title, Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
             Line::from(vec![Span::styled(&song.artist, Style::default().fg(Color::Cyan))]),
             Line::from(vec![Span::styled(song.album.clone().unwrap_or_default(), Style::default().fg(Color::DarkGray))]),
             Line::from(vec![Span::styled(song.url.clone().unwrap_or_default(), Style::default().fg(Color::Blue).add_modifier(Modifier::UNDERLINED))]),
         ];
+        // TUI is text-only: show the cover link, `o` opens it in the browser.
+        if let Some(cover) = &song.cover_url {
+            lines.push(Line::from(vec![Span::styled(format!("🖼 {}", cover), Style::default().fg(Color::DarkGray))]));
+        }
         let p = Paragraph::new(lines).block(block).wrap(Wrap{trim:true});
         f.render_widget(p, content);
     } else if let Some(err) = &app.error {
