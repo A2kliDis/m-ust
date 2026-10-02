@@ -33,6 +33,9 @@ cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 cargo install --path . --bin m-ust   # نسخة محلية
 ```
 
+لينكس يحتاج مكتبة ALSA مرة واحدة: `sudo apt install -y libasound2`
+(`alsa-lib` على Fedora/Arch).
+
 الحذف (يسألك عن الإعدادات والسجل):
 
 ```powershell
