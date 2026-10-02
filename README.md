@@ -2,6 +2,8 @@
 
 > Captures system audio or a specific app, recognizes the song via Shazam (free, no key).
 >
+> **Support:** Windows ✅ · Linux / macOS ⚠️ untested — reports welcome.
+>
 > English | [العربية](README_ar.md)
 
 ## Features
@@ -16,12 +18,12 @@ Only anonymous fingerprints are uploaded — no raw audio ever leaves your machi
 
 ```powershell
 # One line (Windows) — prebuilt binary from the latest GitHub Release:
-irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.ps1 | iex
 ```
 
 ```bash
 # One line (Linux/macOS):
-curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.sh | bash
 ```
 
 From source (requires Rust):
@@ -30,6 +32,16 @@ From source (requires Rust):
 cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 cargo install --path . --bin m-ust   # local checkout
 ```
+
+Uninstall (keeps config + history unless purged):
+
+```powershell
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
+# curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash   # Linux/macOS
+```
+
+Installs to `%LOCALAPPDATA%\m-ust` (`~/.local/bin` on Linux/macOS) and adds it to PATH.
+Portable mode (Windows, no PATH change): `$env:M_UST_NO_PATH=1; irm ... | iex`.
 
 ## Usage
 
