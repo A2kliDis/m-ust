@@ -12,6 +12,44 @@ pub struct ShazamResult {
     pub raw: Value,
 }
 
+/// Downloaded cover art as raw RGB pixels, sized for half-block TUI rendering
+/// (each terminal cell shows 2 stacked pixels via "▀").
+#[derive(Clone, Debug)]
+pub struct CoverPixels {
+    pub w: u32,
+    pub h: u32,
+    pub rgb: Vec<u8>, // w*h*3
+}
+
+impl CoverPixels {
+    pub fn pixel(&self, x: u32, y: u32) -> (u8, u8, u8) {
+        let x = x.min(self.w.saturating_sub(1));
+        let y = y.min(self.h.saturating_sub(1));
+        let i = ((y * self.w + x) * 3) as usize;
+        (self.rgb[i], self.rgb[i + 1], self.rgb[i + 2])
+    }
+}
+
+/// Download + decode cover art. Returns None on any failure (cover is decorative).
+pub async fn fetch_cover(url: &str) -> Option<CoverPixels> {
+    let bytes = reqwest::Client::new()
+        .get(url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .ok()?
+        .bytes()
+        .await
+        .ok()?;
+    if bytes.len() > 5_000_000 {
+        return None;
+    }
+    // 28 cells wide x 14 rows (2 px per row)
+    let img = image::load_from_memory(&bytes).ok()?;
+    let small = img.resize_to_fill(28, 28, image::imageops::FilterType::Triangle).to_rgb8();
+    Some(CoverPixels { w: 28, h: 28, rgb: small.into_raw() })
+}
+
 /// Send fingerprint to Shazam (100% free, no key)
 /// Matches SongRec's communication.rs exactly
 pub async fn recognize_with_shazam(sig: &ShazamSignature) -> Result<ShazamResult> {

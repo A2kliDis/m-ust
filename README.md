@@ -57,7 +57,7 @@ Inside the TUI:
 - `Tab`: switch source (mic / device / app)
 - `↑/↓`: select device/app
 - `r`: record and recognize
-- `o`: open cover art (or song link) in the browser
+- `o`: open the song page in the browser (cover art is shown inline in the TUI)
 - `l`: continuous listening Loop ON/OFF (or `m-ust --loop-mode`) — skips consecutive repeats of the same song automatically
 - `h`: show last 5 of history (auto-saved to `%APPDATA%\m-ust\history.csv`)
 - `c`: clear log

@@ -68,19 +68,43 @@ pub fn draw(f: &mut Frame, app: &App) {
     // Content
     let content = chunks[3];
     if let Some(song) = &app.result {
-        let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open) ");
-        let mut lines = vec![
+        let text_lines = vec![
             Line::from(vec![Span::styled(&song.title, Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
             Line::from(vec![Span::styled(&song.artist, Style::default().fg(Color::Cyan))]),
             Line::from(vec![Span::styled(song.album.clone().unwrap_or_default(), Style::default().fg(Color::DarkGray))]),
             Line::from(vec![Span::styled(song.url.clone().unwrap_or_default(), Style::default().fg(Color::Blue).add_modifier(Modifier::UNDERLINED))]),
         ];
-        // TUI is text-only: show the cover link, `o` opens it in the browser.
-        if let Some(cover) = &song.cover_url {
-            lines.push(Line::from(vec![Span::styled(format!("🖼 {}", cover), Style::default().fg(Color::DarkGray))]));
+        match &song.cover {
+            Some(cover) => {
+                // Cover (28x14 half-blocks) + text side by side
+                let cols = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Length(32), Constraint::Min(0)])
+                    .split(content);
+                let mut img_lines = Vec::with_capacity(14);
+                for row in 0..14 {
+                    let mut spans = Vec::with_capacity(28);
+                    for col in 0..28 {
+                        let (fr, fg, fb) = cover.pixel(col, row * 2);
+                        let (br, bg, bb) = cover.pixel(col, row * 2 + 1);
+                        spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(fr, fg, fb)).bg(Color::Rgb(br, bg, bb))));
+                    }
+                    img_lines.push(Line::from(spans));
+                }
+                let img = Paragraph::new(img_lines)
+                    .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Cover "));
+                f.render_widget(img, cols[0]);
+                let p = Paragraph::new(text_lines)
+                    .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) "))
+                    .wrap(Wrap{trim:true});
+                f.render_widget(p, cols[1]);
+            }
+            None => {
+                let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) ");
+                let p = Paragraph::new(text_lines).block(block).wrap(Wrap{trim:true});
+                f.render_widget(p, content);
+            }
         }
-        let p = Paragraph::new(lines).block(block).wrap(Wrap{trim:true});
-        f.render_widget(p, content);
     } else if let Some(err) = &app.error {
         let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Red)).title(" Result ");
         let short = if err.len()>120 { format!("{}…", &err[..120]) } else { err.clone() };

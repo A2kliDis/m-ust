@@ -7,7 +7,7 @@ use crossterm::{
 use futures::StreamExt;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{time::{Duration, Instant}, io};
-use crate::{config::AppConfig, history::{self, HistoryEntry}, audio::{CaptureMode, AudioCapture, list_input_devices, list_output_devices, list_app_sessions}, fingerprint::generate_shazam_signature, api::{recognize_with_shazam, recognize_with_acoustid}};
+use crate::{config::AppConfig, history::{self, HistoryEntry}, audio::{CaptureMode, AudioCapture, list_input_devices, list_output_devices, list_app_sessions}, fingerprint::generate_shazam_signature, api::{recognize_with_shazam, recognize_with_acoustid, fetch_cover, CoverPixels}};
 #[cfg(target_os = "windows")]
 use crate::audio::get_peak_for_pid;
 
@@ -21,6 +21,7 @@ pub struct SongInfo {
     pub album: Option<String>,
     pub url: Option<String>,
     pub cover_url: Option<String>,
+    pub cover: Option<CoverPixels>,
 }
 
 pub struct App {
@@ -128,12 +129,19 @@ impl App {
                 Ok(audio) => {
                     let sig = generate_shazam_signature(&audio.samples);
                                         match recognize_with_shazam(&sig).await {
-                                            Ok(r) => Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url, cover_url:r.cover_url}),
+                                            Ok(r) => {
+                                                // Cover is decorative: never fail recognition because of it
+                                                let cover = match &r.cover_url {
+                                                    Some(u) => fetch_cover(u).await,
+                                                    None => None,
+                                                };
+                                                Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url, cover_url:r.cover_url, cover})
+                                            },
                         Err(e) => {
                             let msg = e.to_string();
                             if let Some(key) = cfg.acoustid_api_key.clone() {
                                 match recognize_with_acoustid(&audio.samples, 16000, &key).await {
-                                                        Ok(ac) => Ok(SongInfo{title:ac.title, artist:ac.artist, album:ac.album, url:None, cover_url:None}),
+                                                        Ok(ac) => Ok(SongInfo{title:ac.title, artist:ac.artist, album:ac.album, url:None, cover_url:None, cover:None}),
                                     Err(ae) => Err(if msg.contains("matches") { format!("Song not recognized (Shazam+AcoustID). {} — install fpcalc or try louder volume", ae) } else { format!("Shazam: {} | AcoustID: {}", e, ae)}),
                                 }
                             } else {
@@ -245,14 +253,15 @@ pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
                             }
                         },
                         KeyCode::Char('o') | KeyCode::Char('O') => {
+                            // The song page is what matters; cover link is only a fallback
                             let target = app.result.as_ref()
-                                .and_then(|s| s.cover_url.clone().or_else(|| s.url.clone()));
+                                .and_then(|s| s.url.clone().or_else(|| s.cover_url.clone()));
                             match target {
                                 Some(link) => {
                                     open_in_browser(&link);
                                     app.push_log(format!("Opened: {}", link));
                                 }
-                                None => app.push_log("No result to open yet — press r first".to_string()),
+                                None => app.push_log("No song link yet — press r first".to_string()),
                             }
                         },
                         KeyCode::Tab => {
