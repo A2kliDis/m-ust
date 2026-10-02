@@ -40,6 +40,9 @@ irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
 # curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash   # Linux/macOS
 ```
 
+يُثبت في `%LOCALAPPDATA%\m-ust` (أو `~/.local/bin` على Linux/macOS) ويضيفه للـ PATH.
+وضع محمول (Windows، بدون PATH): `$env:M_UST_NO_PATH=1; irm ... | iex`.
+
 ## التشغيل
 
 ```powershell

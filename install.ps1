@@ -1,12 +1,16 @@
 #!/usr/bin/env pwsh
-# One-line install for m-ust (Windows):
+# One-line install for m-ust (Windows, no Rust needed):
 #   irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.ps1 | iex
+# Portable (no PATH change):
+#   $env:M_UST_NO_PATH=1; irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.ps1 | iex
+param([switch]$NoPath)
 $ErrorActionPreference = "Stop"
 $Repo = "A2kliDis/m-ust"
 $Name = "m-ust"
-$BinDir = Join-Path $env:USERPROFILE ".cargo\bin"
+$InstallDir = Join-Path $env:LOCALAPPDATA $Name
+if ($env:M_UST_NO_PATH) { $NoPath = $true }
 
-if (-not (Test-Path $BinDir)) { New-Item -ItemType Directory -Path $BinDir | Out-Null }
+if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir | Out-Null }
 $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -TimeoutSec 20
 $asset = @($rel.assets | Where-Object { $_.name -like "*windows*.zip" }) | Select-Object -First 1
 if (-not $asset) { throw "release $($rel.tag_name) has no Windows asset" }
@@ -18,7 +22,20 @@ Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -TimeoutSec 120
 Expand-Archive -Path $zip -DestinationPath $tmp -Force
 $exe = Get-ChildItem -Path $tmp -Filter "$Name.exe" -Recurse | Select-Object -First 1
 if (-not $exe) { throw "archive contains no $Name.exe" }
-Copy-Item $exe.FullName (Join-Path $BinDir "$Name.exe") -Force
+$destExe = Join-Path $InstallDir ($Name + ".exe")
+Copy-Item $exe.FullName $destExe -Force
 Remove-Item -Recurse -Force $tmp
-Write-Host "$Name $($rel.tag_name) installed to $BinDir"
-& (Join-Path $BinDir "$Name.exe") --version
+Write-Host "$Name $($rel.tag_name) installed to $InstallDir"
+
+if (-not $NoPath) {
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if (($userPath -split ";" | Where-Object { $_ -ne "" }) -notcontains $InstallDir) {
+        [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
+        Write-Host "Added to user PATH - restart your terminal, then run: m-ust --version"
+    } else {
+        & (Join-Path $InstallDir ($Name + ".exe")) --version
+    }
+} else {
+    $exePath = Join-Path $InstallDir ($Name + ".exe")
+    Write-Host "Portable mode: run it directly: $exePath"
+}

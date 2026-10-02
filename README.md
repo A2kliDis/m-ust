@@ -40,6 +40,9 @@ irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
 # curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash   # Linux/macOS
 ```
 
+Installs to `%LOCALAPPDATA%\m-ust` (`~/.local/bin` on Linux/macOS) and adds it to PATH.
+Portable mode (Windows, no PATH change): `$env:M_UST_NO_PATH=1; irm ... | iex`.
+
 ## Usage
 
 ```powershell

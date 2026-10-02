@@ -2,20 +2,32 @@
 # Uninstall m-ust (Windows):
 #   irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
 # Add -Purge to also delete config + history:
-#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex -Purge
+#   $s = irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1; & ([scriptblock]::Create($s)) -Purge
 param([switch]$Purge)
 $ErrorActionPreference = "Stop"
 $Name = "m-ust"
-$Exe = Join-Path (Join-Path $env:USERPROFILE ".cargo\bin") "$Name.exe"
+$InstallDir = Join-Path $env:LOCALAPPDATA $Name
+$LegacyExe = Join-Path (Join-Path $env:USERPROFILE ".cargo\bin") "$Name.exe"
 
 if (Get-Process $Name -ErrorAction SilentlyContinue) {
     throw "$Name is running. Quit it (q) first, then rerun this script."
 }
-if (Test-Path $Exe) {
-    Remove-Item $Exe -Force
-    Write-Host "Removed $Exe"
-} else {
-    Write-Host "$Name is not installed."
+$removed = $false
+foreach ($exe in @((Join-Path $InstallDir "$Name.exe"), $LegacyExe)) {
+    if (Test-Path $exe) {
+        Remove-Item $exe -Force
+        Write-Host "Removed $exe"
+        $removed = $true
+    }
+}
+if (-not $removed) { Write-Host "$Name is not installed." }
+
+# Drop the install dir from user PATH (harmless if absent)
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+$parts = @($userPath -split ";" | Where-Object { $_ -ne "" -and $_ -ne $InstallDir })
+if ($parts.Count -ne (($userPath -split ";").Count)) {
+    [Environment]::SetEnvironmentVariable("Path", ($parts -join ";"), "User")
+    Write-Host "Removed $InstallDir from user PATH."
 }
 
 $DataDir = Join-Path $env:APPDATA $Name
