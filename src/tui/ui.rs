@@ -76,28 +76,42 @@ pub fn draw(f: &mut Frame, app: &App) {
         ];
         match &song.cover {
             Some(cover) => {
-                // Cover (28x14 half-blocks) + text side by side
-                let cols = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Length(32), Constraint::Min(0)])
-                    .split(content);
-                let mut img_lines = Vec::with_capacity(14);
-                for row in 0..14 {
-                    let mut spans = Vec::with_capacity(28);
-                    for col in 0..28 {
-                        let (fr, fg, fb) = cover.pixel(col, row * 2);
-                        let (br, bg, bb) = cover.pixel(col, row * 2 + 1);
-                        spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(fr, fg, fb)).bg(Color::Rgb(br, bg, bb))));
+                // Adaptive size: fit the content area (image pane <= half width).
+                // Falls back to text-only on tiny terminals — never overflows.
+                let ch = content.height as usize;
+                let cw = content.width as usize;
+                let rows = (ch.saturating_sub(2)).min((cw / 4).saturating_sub(1)).clamp(0, 20);
+                if rows < 6 || cw < 60 {
+                    let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) ");
+                    let p = Paragraph::new(text_lines).block(block).wrap(Wrap{trim:true});
+                    f.render_widget(p, content);
+                } else {
+                    let img_w = (rows * 2) as u16;
+                    // Cover (rows x 2*rows half-blocks) + text side by side
+                    let cols = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints([Constraint::Length(img_w + 2), Constraint::Min(0)])
+                        .split(content);
+                    let mut img_lines = Vec::with_capacity(rows);
+                    for row in 0..rows {
+                        let mut spans = Vec::with_capacity(rows * 2);
+                        for col in 0..rows * 2 {
+                            let sx = (col * cover.w as usize / (rows * 2)) as u32;
+                            let sy = (row * 2 * cover.h as usize / (rows * 2)) as u32;
+                            let (fr, fg, fb) = cover.pixel(sx, sy);
+                            let (br, bg, bb) = cover.pixel(sx, sy + 1);
+                            spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(fr, fg, fb)).bg(Color::Rgb(br, bg, bb))));
+                        }
+                        img_lines.push(Line::from(spans));
                     }
-                    img_lines.push(Line::from(spans));
+                    let img = Paragraph::new(img_lines)
+                        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Cover "));
+                    f.render_widget(img, cols[0]);
+                    let p = Paragraph::new(text_lines)
+                        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) "))
+                        .wrap(Wrap{trim:true});
+                    f.render_widget(p, cols[1]);
                 }
-                let img = Paragraph::new(img_lines)
-                    .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Cover "));
-                f.render_widget(img, cols[0]);
-                let p = Paragraph::new(text_lines)
-                    .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) "))
-                    .wrap(Wrap{trim:true});
-                f.render_widget(p, cols[1]);
             }
             None => {
                 let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) ");

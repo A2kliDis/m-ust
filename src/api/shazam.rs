@@ -44,10 +44,11 @@ pub async fn fetch_cover(url: &str) -> Option<CoverPixels> {
     if bytes.len() > 5_000_000 {
         return None;
     }
-    // 28 cells wide x 14 rows (2 px per row)
+    // Decode at 40x40; the UI downsamples to whatever fits the terminal.
+    // (Half-blocks: each cell = 2 stacked pixels, so 40px -> up to 20 rows.)
     let img = image::load_from_memory(&bytes).ok()?;
-    let small = img.resize_to_fill(28, 28, image::imageops::FilterType::Triangle).to_rgb8();
-    Some(CoverPixels { w: 28, h: 28, rgb: small.into_raw() })
+    let small = img.resize_to_fill(40, 40, image::imageops::FilterType::Triangle).to_rgb8();
+    Some(CoverPixels { w: 40, h: 40, rgb: small.into_raw() })
 }
 
 /// Send fingerprint to Shazam (100% free, no key)
