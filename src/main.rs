@@ -14,7 +14,7 @@ use clap::Parser;
 use config::AppConfig;
 
 #[derive(Parser, Debug)]
-#[command(name="m-ust", version, about="Song recognizer TUI - 100% Rust, 100% free")]
+#[command(name="m-ust", version, about="Song recognizer TUI (100% Rust)")]
 struct Args {
     /// Recording duration in seconds
     #[arg(short, long, default_value_t = 12)]

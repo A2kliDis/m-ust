@@ -32,7 +32,6 @@ pub fn draw(f: &mut Frame, app: &App) {
         Span::styled(" M-ust ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         Span::styled("Song Recognizer", Style::default().fg(Color::White)),
         Span::styled("  v0.1  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("— 100% free • Rust", Style::default().fg(Color::DarkGray)),
     ]))
     .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)))
     .alignment(Alignment::Center);
