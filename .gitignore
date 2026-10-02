@@ -4,3 +4,5 @@ fpcalc.exe
 fpcalc
 config.toml
 debug_last.wav
+# Local agent memory — personal workflow, never commit
+AGENTS.md
