@@ -133,17 +133,8 @@ fn try_list_sessions_wasapi() -> anyhow::Result<Vec<String>> {
         }
     }
 
-    if out.is_empty() {
-        // Fallback to sysinfo active processes that have audio capability (heuristic)
-        for (pid, proc) in sys.processes() {
-            let name = proc.name().to_string_lossy().to_lowercase();
-            if ["chrome", "firefox", "msedge", "spotify", "vlc", "youtube", "discord", "steam"].iter().any(|k| name.contains(k)) {
-                out.push(format!("{} (PID {})", proc.name().to_string_lossy(), pid.as_u32()));
-                if out.len() >= 8 { break; }
-            }
-        }
-    }
-    // NOTE: no fake names — empty means "no active audio apps", the TUI shows a hint.
+    // NOTE: no name-based guessing — if WASAPI reports no active sessions,
+    // return empty so the TUI shows "no active audio apps".
     // Real PIDs come from IAudioSessionManager2 above.
     Ok(out)
 }
