@@ -81,7 +81,7 @@ pub fn draw(f: &mut Frame, app: &App) {
                 let cw = content.width as usize;
                 let rows = (ch.saturating_sub(2)).min((cw / 4).saturating_sub(1)).clamp(0, 20);
                 if rows < 6 || cw < 60 {
-                    let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) ");
+                    let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result ");
                     let p = Paragraph::new(text_lines).block(block).wrap(Wrap{trim:true});
                     f.render_widget(p, content);
                 } else {
@@ -107,13 +107,13 @@ pub fn draw(f: &mut Frame, app: &App) {
                         .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Cover "));
                     f.render_widget(img, cols[0]);
                     let p = Paragraph::new(text_lines)
-                        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) "))
+                        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result "))
                         .wrap(Wrap{trim:true});
                     f.render_widget(p, cols[1]);
                 }
             }
             None => {
-                let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result (o=open song) ");
+                let block = Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green)).title(" Result ");
                 let p = Paragraph::new(text_lines).block(block).wrap(Wrap{trim:true});
                 f.render_widget(p, content);
             }
