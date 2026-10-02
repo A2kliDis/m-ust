@@ -29,7 +29,19 @@ The fingerprint is just a list of spectral peaks `(freq, time)` — audio cannot
 ## Install
 
 ```powershell
-# From source (requires Rust)
+# One line (Windows) — prebuilt binary from the latest GitHub Release,
+# falls back to cargo if no release exists yet:
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
+```
+
+```bash
+# One line (Linux/macOS):
+curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.sh | bash
+```
+
+From source (requires Rust):
+
+```powershell
 cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 
 # Or locally

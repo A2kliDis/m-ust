@@ -29,7 +29,19 @@
 ## التثبيت
 
 ```powershell
-# من المصدر (يتطلب Rust)
+# سطر واحد (Windows) — نسخة جاهزة من آخر GitHub Release،
+# ويرجع لـ cargo إذا لا يوجد إصدار بعد:
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
+```
+
+```bash
+# سطر واحد (Linux/macOS):
+curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.sh | bash
+```
+
+من المصدر (يتطلب Rust):
+
+```powershell
 cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 
 # أو محلياً
