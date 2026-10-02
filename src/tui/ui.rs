@@ -140,10 +140,14 @@ pub fn draw(f: &mut Frame, app: &App) {
     }
 
     // Footer — single minimal help line
+    let loop_style = if app.continuous { Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD) } else { Style::default().fg(Color::White).add_modifier(Modifier::BOLD) };
+    let loop_label = if app.continuous { " loop:ON  " } else { " loop  " };
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" r", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)), Span::styled(" record  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" l", loop_style), Span::styled(loop_label, Style::default().fg(Color::DarkGray)),
+        Span::styled("h", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)), Span::styled(" history  ", Style::default().fg(Color::DarkGray)),
         Span::styled("Tab", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)), Span::styled(" switch  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("↑↓", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)), Span::styled(" navigate  ", Style::default().fg(Color::DarkGray)),
+        Span::styled("↑↓", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)), Span::styled(" nav  ", Style::default().fg(Color::DarkGray)),
         Span::styled("g", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)), Span::styled(" refresh  ", Style::default().fg(Color::DarkGray)),
         Span::styled("d", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)), Span::styled(" default  ", Style::default().fg(Color::DarkGray)),
         Span::styled("q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)), Span::styled(" quit", Style::default().fg(Color::DarkGray)),

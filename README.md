@@ -56,6 +56,8 @@ cargo run -- --acoustid-key YOUR_KEY --duration 15
 - `Tab` : تبديل المصدر (مايكروفون / جهاز / تطبيق)
 - `↑/↓` : اختيار جهاز/تطبيق
 - `r` : تسجيل وتعرف
+- `l` : وضع الاستماع المستمر Loop ON/OFF (أو `m-ust --loop-mode`)
+- `h` : عرض آخر 5 من السجل (يُحفظ تلقائياً في `%APPDATA%\m-ust\history.csv`)
 - `c` : مسح السجل
 - `q` : خروج
 
@@ -127,11 +129,12 @@ src/
 ```
 
 ## تطوير إضافي مقترح
-- [ ] تفعيل WASAPI loopback الحقيقي (استبدال الـ stub في `capture.rs:122`)
-- [ ] سرد PID الحقيقي عبر `wasapi::AudioSessionManager` بدل أسماء وهمية
-- [ ] حفظ التاريخ في `~/.local/share/m-ust/history.csv`
-- [ ] إضافة `fpcalc` integration للـ AcoustID الحقيقي (يتطلب `chromaprint`)
-- [ ] وضع Continuous listening (مثل `songrec listen`)
+- [x] تفعيل WASAPI loopback الحقيقي (`src/audio/capture.rs`)
+- [x] سرد PID الحقيقي عبر `IAudioSessionManager2` (بدون أسماء وهمية)
+- [x] حفظ السجل في `history.csv` (يُعرض بزر `h`)
+- [x] `fpcalc` integration للـ AcoustID الحقيقي (اختياري، يتطلب `chromaprint`)
+- [x] وضع Continuous listening (`l` أو `m-ust --loop-mode`)
+- [ ] تنبيه التحديثات من داخل الأداة (فحص GitHub Releases)
 
 ## بناء release
 

@@ -7,7 +7,7 @@ use crossterm::{
 use futures::StreamExt;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{time::{Duration, Instant}, io};
-use crate::{config::AppConfig, audio::{CaptureMode, AudioCapture, list_input_devices, list_output_devices, list_app_sessions}, fingerprint::generate_shazam_signature, api::{recognize_with_shazam, recognize_with_acoustid}};
+use crate::{config::AppConfig, history::{self, HistoryEntry}, audio::{CaptureMode, AudioCapture, list_input_devices, list_output_devices, list_app_sessions}, fingerprint::generate_shazam_signature, api::{recognize_with_shazam, recognize_with_acoustid}};
 #[cfg(target_os = "windows")]
 use crate::audio::get_peak_for_pid;
 
@@ -40,6 +40,9 @@ pub struct App {
     pub progress: f32,
     pub elapsed: u64,
     pub record_start: Option<Instant>,
+    pub continuous: bool,
+    pub restart_at: Option<Instant>,
+    pub history: Vec<HistoryEntry>,
 }
 
 impl App {
@@ -59,6 +62,10 @@ impl App {
         if let Some(def) = config.default_output.as_ref().or(config.default_input.as_ref()) {
             log.push(format!("Default: {}", def));
         }
+        let history = history::load();
+        if !history.is_empty() {
+            log.push(format!("History: {} songs (press h)", history.len()));
+        }
         Self {
             config,
             status: Status::Idle,
@@ -77,6 +84,9 @@ impl App {
             progress: 0.0,
             elapsed: 0,
             record_start: None,
+            continuous: false,
+            restart_at: None,
+            history,
         }
     }
     fn current_mode(&self) -> CaptureMode {
@@ -88,6 +98,54 @@ impl App {
         }
     }
     pub fn push_log(&mut self, s: impl Into<String>) { self.log.push(s.into()); if self.log.len()>100 { self.log.remove(0); } }
+    fn can_record(&self) -> bool {
+        self.status == Status::Idle || self.status == Status::Done || self.status == Status::Error
+    }
+    fn start_recording(&mut self, tx: &tokio::sync::mpsc::UnboundedSender<Result<SongInfo, String>>) {
+        if !self.can_record() { return; }
+        self.restart_at = None;
+        let mode = self.current_mode();
+        let secs = self.config.record_duration_secs;
+        let cfg = self.config.clone();
+        let friendly = match &mode {
+            CaptureMode::Microphone(n) => if n.is_empty() {"Microphone".into()} else {n.clone()},
+            CaptureMode::SystemLoopback(n) => if n=="Default" {"System".into()} else {n.clone()},
+            CaptureMode::AppLoopback(n) => n.clone(),
+        };
+        self.mode = mode.clone();
+        self.status = Status::Recording;
+        self.progress = 0.0;
+        self.elapsed = 0;
+        self.result = None;
+        self.error = None;
+        self.record_start = Some(Instant::now());
+        self.push_log(format!("Recording {} • {}s", friendly, secs));
+        let tx2 = tx.clone();
+        tokio::task::spawn_local(async move {
+            let capture = AudioCapture::new(mode, secs);
+            let res: Result<SongInfo, String> = match capture.record().await {
+                Ok(audio) => {
+                    let sig = generate_shazam_signature(&audio.samples);
+                    match recognize_with_shazam(&sig).await {
+                        Ok(r) => Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url}),
+                        Err(e) => {
+                            let msg = e.to_string();
+                            if let Some(key) = cfg.acoustid_api_key.clone() {
+                                match recognize_with_acoustid(&audio.samples, 16000, &key).await {
+                                    Ok(ac) => Ok(SongInfo{title:ac.title, artist:ac.artist, album:ac.album, url:None}),
+                                    Err(ae) => Err(if msg.contains("matches") { format!("Song not recognized (Shazam+AcoustID). {} — install fpcalc or try louder volume", ae) } else { format!("Shazam: {} | AcoustID: {}", e, ae)}),
+                                }
+                            } else {
+                                Err(if msg.contains("matches") { "Song not recognized. Try louder volume or popular song".into() } else { e.to_string() })
+                            }
+                        }
+                    }
+                },
+                Err(e) => Err(format!("Capture failed: {}", e)),
+            };
+            let _ = tx2.send(res);
+        });
+    }
     #[cfg(target_os = "windows")]
     fn update_peaks(&mut self) {
         if self.capture_tab != 2 { return; }
@@ -118,7 +176,7 @@ fn parse_pid(s: &str) -> Option<u32> {
     s.trim().parse().ok()
 }
 
-pub async fn run(config: AppConfig) -> Result<()> {
+pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -128,6 +186,11 @@ pub async fn run(config: AppConfig) -> Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<SongInfo, String>>();
     let mut events = crossterm::event::EventStream::new();
     let mut ticker = tokio::time::interval(Duration::from_millis(100));
+    if continuous {
+        app.continuous = true;
+        app.push_log("Loop mode — listening continuously (l to stop, q to quit)".to_string());
+        app.start_recording(&tx);
+    }
     // Draw immediately
     terminal.draw(|f| super::ui::draw(f, &app))?;
     loop {
@@ -137,48 +200,33 @@ pub async fn run(config: AppConfig) -> Result<()> {
                     if key.kind != KeyEventKind::Press { continue; }
                     match key.code {
                         KeyCode::Char('q') => break,
-                        KeyCode::Char('r') if app.status==Status::Idle || app.status==Status::Done || app.status==Status::Error => {
-                            let mode = app.current_mode();
-                            let secs = app.config.record_duration_secs;
-                            let cfg = app.config.clone();
-                            let friendly = match &mode {
-                                CaptureMode::Microphone(n) => if n.is_empty() {"Microphone".into()} else {n.clone()},
-                                CaptureMode::SystemLoopback(n) => if n=="Default" {"System".into()} else {n.clone()},
-                                CaptureMode::AppLoopback(n) => n.clone(),
-                            };
-                            app.mode = mode.clone();
-                            app.status = Status::Recording;
-                            app.progress = 0.0;
-                            app.elapsed = 0;
-                            app.result = None;
-                            app.error = None;
-                            app.record_start = Some(Instant::now());
-                            app.push_log(format!("Recording {} • {}s", friendly, secs));
-                            let tx2 = tx.clone();
-                            tokio::task::spawn_local(async move {
-                                let capture = AudioCapture::new(mode, secs);
-                                let res: Result<SongInfo, String> = match capture.record().await {
-                                    Ok(audio) => {
-                                        let sig = generate_shazam_signature(&audio.samples);
-                                        match recognize_with_shazam(&sig).await {
-                                            Ok(r) => Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url}),
-                                            Err(e) => {
-                                                let msg = e.to_string();
-                                                if let Some(key) = cfg.acoustid_api_key.clone() {
-                                                    match recognize_with_acoustid(&audio.samples, 16000, &key).await {
-                                                        Ok(ac) => Ok(SongInfo{title:ac.title, artist:ac.artist, album:ac.album, url:None}),
-                                                        Err(ae) => Err(if msg.contains("matches") { format!("Song not recognized (Shazam+AcoustID). {} — install fpcalc or try louder volume", ae) } else { format!("Shazam: {} | AcoustID: {}", e, ae)}),
-                                                    }
-                                                } else {
-                                                    Err(if msg.contains("matches") { "Song not recognized. Try louder volume or popular song".into() } else { e.to_string() })
-                                                }
-                                            }
-                                        }
-                                    },
-                                    Err(e) => Err(format!("Capture failed: {}", e)),
-                                };
-                                let _ = tx2.send(res);
-                            });
+                        KeyCode::Char('r') if app.can_record() => {
+                            app.start_recording(&tx);
+                        },
+                        KeyCode::Char('l') | KeyCode::Char('L') => {
+                            app.continuous = !app.continuous;
+                            app.restart_at = None;
+                            if app.continuous {
+                                app.push_log("Loop ON — continuous listening (l to stop)".to_string());
+                                app.status = Status::Idle;
+                                app.error = None;
+                                app.result = None;
+                                app.start_recording(&tx);
+                            } else {
+                                app.push_log("Loop OFF".to_string());
+                            }
+                        },
+                        KeyCode::Char('h') | KeyCode::Char('H') => {
+                            if app.history.is_empty() {
+                                app.push_log("No history yet — recognized songs are saved automatically".to_string());
+                            } else {
+                                let total = app.history.len();
+                                app.push_log(format!("--- History: {} songs (last {}) ---", total, total.min(5)));
+                                let start = total.saturating_sub(5);
+                                for e in app.history[start..].to_vec() {
+                                    app.push_log(format!("{} — {} - {}", e.timestamp, e.artist, e.title));
+                                }
+                            }
                         },
                         KeyCode::Tab => {
                             if app.status == Status::Done || app.status == Status::Error {
@@ -250,11 +298,17 @@ pub async fn run(config: AppConfig) -> Result<()> {
                     match res {
                         Ok(song) => {
                             app.push_log(format!("{} - {}", song.artist, song.title));
+                            let entry = HistoryEntry::now(song.artist.clone(), song.title.clone(), song.album.clone());
+                            history::append(&entry);
+                            app.history.push(entry);
                             app.result = Some(song);
                             app.status = Status::Done;
                             app.progress = 1.0;
                             app.record_start = None;
                             app.elapsed = app.config.record_duration_secs;
+                            if app.continuous {
+                                app.restart_at = Some(Instant::now() + Duration::from_secs(3));
+                            }
                         },
                         Err(e) => {
                             app.push_log(format!("Failed: {}", e));
@@ -263,6 +317,18 @@ pub async fn run(config: AppConfig) -> Result<()> {
                             app.progress = 1.0;
                             app.record_start = None;
                             app.elapsed = app.config.record_duration_secs;
+                            if app.continuous {
+                                app.restart_at = Some(Instant::now() + Duration::from_secs(5));
+                            }
+                        }
+                    }
+                }
+                // Continuous listening — auto-restart after cooldown
+                if app.continuous {
+                    if let Some(at) = app.restart_at {
+                        if Instant::now() >= at {
+                            app.status = Status::Idle;
+                            app.start_recording(&tx);
                         }
                     }
                 }

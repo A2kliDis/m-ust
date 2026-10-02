@@ -143,9 +143,8 @@ fn try_list_sessions_wasapi() -> anyhow::Result<Vec<String>> {
             }
         }
     }
-    if out.is_empty() {
-        out = vec!["chrome.exe".into(), "firefox.exe".into(), "spotify.exe".into()];
-    }
+    // NOTE: no fake names — empty means "no active audio apps", the TUI shows a hint.
+    // Real PIDs come from IAudioSessionManager2 above.
     Ok(out)
 }
 

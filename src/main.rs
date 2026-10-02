@@ -6,6 +6,7 @@ mod api;
 mod audio;
 mod config;
 mod fingerprint;
+mod history;
 mod tui;
 
 use anyhow::Result;
@@ -23,6 +24,10 @@ struct Args {
     /// Also read from env M_UST_ACOUSTID_KEY (or ACOUSTID_KEY). CLI wins over env, env wins over config file.
     #[arg(long, env = "M_UST_ACOUSTID_KEY")]
     acoustid_key: Option<String>,
+
+    /// Start in continuous listening mode (like `songrec listen`)
+    #[arg(long)]
+    loop_mode: bool,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -36,5 +41,5 @@ async fn main() -> Result<()> {
     config.merge_args(duration_opt, args.acoustid_key);
 
     let local = tokio::task::LocalSet::new();
-    local.run_until(tui::run(config)).await
+    local.run_until(tui::run(config, args.loop_mode)).await
 }
