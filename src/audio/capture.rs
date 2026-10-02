@@ -1,7 +1,7 @@
 //! Audio capture: Microphone + System Loopback + Per-App (Windows)
 use anyhow::{Result, anyhow};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use super::parse_pid;
+use super::{parse_pid, SYSTEM_DEFAULT};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -50,7 +50,7 @@ impl AudioCapture {
     // --- CPAL Microphone ---
     async fn record_cpal_input(&self, device_name: &str) -> Result<CapturedAudio> {
         let host = cpal::default_host();
-        let device = if device_name.is_empty() {
+        let device = if device_name.is_empty() || device_name == SYSTEM_DEFAULT {
             host.default_input_device().ok_or_else(|| anyhow!("No default input device"))?
         } else {
             host.input_devices()?.find(|d| d.name().map(|n| n==device_name).unwrap_or(false))
@@ -209,7 +209,7 @@ fn wasapi_loopback_blocking_for_device(device_name: String, duration: Duration) 
 
     let _ = initialize_mta();
 
-    let device = if device_name == "Default" || device_name.is_empty() {
+    let device = if device_name == "Default" || device_name == SYSTEM_DEFAULT || device_name.is_empty() {
         get_default_device(&Direction::Render).map_err(|e| anyhow!("get default render device: {}", e))?
     } else {
         let coll = DeviceCollection::new(&Direction::Render).map_err(|e| anyhow!("enum devices: {}", e))?;

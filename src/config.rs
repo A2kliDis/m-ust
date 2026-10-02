@@ -64,15 +64,6 @@ impl AppConfig {
                 return cfg;
             }
         }
-        // Backward compat: old "must" config location
-        if let Some(dir) = dirs::config_dir() {
-            let old = dir.join("must").join("config.toml");
-            if let Ok(txt) = std::fs::read_to_string(&old) {
-                if let Ok(cfg) = toml::from_str::<AppConfig>(&txt) {
-                    return cfg;
-                }
-            }
-        }
         // Try local dir fallback
         if let Ok(txt) = std::fs::read_to_string("config.toml") {
             if let Ok(cfg) = toml::from_str::<AppConfig>(&txt) {

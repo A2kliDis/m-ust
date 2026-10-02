@@ -10,10 +10,14 @@ pub struct AudioDeviceInfo {
     pub is_monitor: bool,
 }
 
+/// Virtual entry pinned at the top of every device list.
+/// Resolves to the real OS default at capture time (never sent to WASAPI/CPAL as-is).
+pub const SYSTEM_DEFAULT: &str = "System Default";
+
 pub fn list_input_devices() -> Result<Vec<AudioDeviceInfo>> {
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();
-    let mut out = Vec::new();
+    let mut out = vec![AudioDeviceInfo { name: SYSTEM_DEFAULT.into(), is_loopback: false, is_monitor: false }];
     for dev in host.input_devices()? {
         if let Ok(name) = dev.name() {
             out.push(AudioDeviceInfo { name, is_loopback: false, is_monitor: false });
@@ -28,7 +32,7 @@ pub fn list_output_devices() -> Vec<AudioDeviceInfo> {
         use wasapi::{Direction, DeviceCollection};
         let _ = wasapi::initialize_mta();
         if let Ok(coll) = DeviceCollection::new(&Direction::Render) {
-            let mut out = Vec::new();
+            let mut out = vec![AudioDeviceInfo { name: SYSTEM_DEFAULT.into(), is_loopback: false, is_monitor: false }];
             if let Ok(n) = coll.get_nbr_devices() {
                 for i in 0..n {
                     if let Ok(dev) = coll.get_device_at_index(i) {
@@ -38,13 +42,13 @@ pub fn list_output_devices() -> Vec<AudioDeviceInfo> {
                     }
                 }
             }
-            if !out.is_empty() { return out; }
+            if out.len() > 1 { return out; }
         }
     }
     // Fallback to cpal output devices
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();
-    let mut out = Vec::new();
+    let mut out = vec![AudioDeviceInfo { name: SYSTEM_DEFAULT.into(), is_loopback: false, is_monitor: false }];
     if let Ok(devs) = host.output_devices() {
         for dev in devs {
             if let Ok(name) = dev.name() {
@@ -52,7 +56,6 @@ pub fn list_output_devices() -> Vec<AudioDeviceInfo> {
             }
         }
     }
-    if out.is_empty() { out.push(AudioDeviceInfo { name: "Default Output".into(), is_loopback: true, is_monitor: true }); }
     out
 }
 
