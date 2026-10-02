@@ -31,6 +31,10 @@ if ($parts.Count -ne (($userPath -split ";").Count)) {
 }
 
 $DataDir = Join-Path $env:APPDATA $Name
+if (-not $Purge -and [Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+    $ans = Read-Host "Also delete settings + history? [y/N]"
+    if ($ans -eq "y" -or $ans -eq "Y") { $Purge = $true }
+}
 if ($Purge) {
     if (Test-Path $DataDir) {
         Remove-Item -Recurse -Force $DataDir
