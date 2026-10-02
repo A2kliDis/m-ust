@@ -9,7 +9,6 @@ pub struct ShazamResult {
     pub album: Option<String>,
     pub url: Option<String>,
     pub cover_url: Option<String>,
-    pub raw: Value,
 }
 
 /// Downloaded cover art as raw RGB pixels, sized for half-block TUI rendering
@@ -92,17 +91,18 @@ pub async fn recognize_with_shazam(sig: &ShazamSignature) -> Result<ShazamResult
         .json(&body)
         .send().await.map_err(|e| anyhow!("network: {}", e))?;
 
-    if !resp.status().is_success() {
+    let status = resp.status();
+    if !status.is_success() {
         let txt = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("Shazam HTTP {}: {}", 0, txt));
+        return Err(anyhow!("Shazam HTTP {}: {}", status, txt));
     }
     let v: Value = resp.json().await?;
     // SongRec checks track directly, then matches[0].track
     if let Some(track) = v.get("track").cloned() {
-        return parse_track(&track, v);
+        return parse_track(&track);
     }
     if let Some(m) = v.get("matches").and_then(|m| m.as_array()).and_then(|a| a.first()).cloned() {
-        if let Some(track) = m.get("track").cloned() { return parse_track(&track, v); }
+        if let Some(track) = m.get("track").cloned() { return parse_track(&track); }
         // Some responses have no track but retryms hint -> not found
         if m.get("retryms").is_some() {
             return Err(anyhow!("Song not recognized (retryms): {}", v));
@@ -111,7 +111,7 @@ pub async fn recognize_with_shazam(sig: &ShazamSignature) -> Result<ShazamResult
     Err(anyhow!("Song not recognized: {}", v))
 }
 
-fn parse_track(track: &Value, raw: Value) -> Result<ShazamResult> {
+fn parse_track(track: &Value) -> Result<ShazamResult> {
     let title = track.get("title").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
     let artist = track.get("subtitle").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
     let album = track.get("sections").and_then(|s| s.as_array())
@@ -126,5 +126,5 @@ fn parse_track(track: &Value, raw: Value) -> Result<ShazamResult> {
         .or_else(|| track.get("images").and_then(|i| i.get("coverart")).and_then(|v| v.as_str()))
         .or_else(|| track.get("share").and_then(|s| s.get("image")).and_then(|h| h.as_str()))
         .map(|s| s.to_string());
-    Ok(ShazamResult { title, artist, album, url, cover_url, raw })
+    Ok(ShazamResult { title, artist, album, url, cover_url })
 }

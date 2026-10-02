@@ -1,36 +1,21 @@
 # M-ust — Song recognizer TUI (100% Rust)
 
-> Fully built in Rust • 100% free • captures system audio or a specific app
+> Captures system audio or a specific app, recognizes the song via Shazam (free, no key).
 >
 > English | [العربية](README_ar.md)
 
 ## Features
-- **ratatui TUI**: fast text UI — pick a source and press `r`
-- **Three capture modes**:
-  1. 🎤 Microphone (CPAL)
-  2. 🔊 System audio loopback — everything coming out of the speakers
-  3. 🎯 Specific app (Windows process loopback)
-- **Pure-Rust Shazam fingerprint**: `rustfft` + Wang 2003 algorithm (like SongRec) — no C libraries
-- **100% free**: sends only the fingerprint (peaks) to `amp.shazam.com` — no key needed, no raw audio uploaded
-- **AcoustID fallback**: optional if Shazam fails, with a free key from `acoustid.org`
+- Text UI (`ratatui`) — pick a source, press `r`
+- Three sources: microphone, system audio (loopback), or a specific app (Windows)
+- Optional AcoustID fallback with a free key
+- Listening history (`h`) and continuous loop mode (`l` / `--loop-mode`)
 
-## How it works
-
-```
-[ CPAL / WASAPI Loopback ] -> mono 16kHz (downmix+resample)
-        ↓
-[ Shazam Fingerprint ] 2048 FFT + Hanning -> Peak Spreading (freq/time) -> 4 bands
-        ↓
-[ POST https://amp.shazam.com/discovery/v5/... ] -> JSON {title, artist, album, url}
-```
-
-The fingerprint is just a list of spectral peaks `(freq, time)` — audio cannot be reconstructed from it. Privacy preserved.
+Only anonymous fingerprints are uploaded — no raw audio ever leaves your machine.
 
 ## Install
 
 ```powershell
-# One line (Windows) — prebuilt binary from the latest GitHub Release,
-# falls back to cargo if no release exists yet:
+# One line (Windows) — prebuilt binary from the latest GitHub Release:
 irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
 ```
 
@@ -43,114 +28,29 @@ From source (requires Rust):
 
 ```powershell
 cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
-
-# Or locally
-cargo install --path . --bin m-ust
+cargo install --path . --bin m-ust   # local checkout
 ```
 
 ## Usage
 
 ```powershell
-m-ust                    # default 12 seconds
+m-ust                                 # default 12 seconds
 m-ust --duration 12
-m-ust --acoustid-key YOUR_KEY --duration 15
-# Or via env var (never written to the config file):
-$env:M_UST_ACOUSTID_KEY="YOUR_KEY"; m-ust
+m-ust --loop-mode                     # keep listening until you quit
+m-ust --acoustid-key YOUR_KEY         # enable AcoustID fallback
+$env:M_UST_ACOUSTID_KEY="YOUR_KEY"; m-ust   # same, without saving to disk
 ```
 
-For development:
+Keys inside the TUI: `Tab` switch source • `↑/↓` select • `r` record • `l` loop • `h` history • `o` open song • `c` clear log • `q` quit
 
-```powershell
-cargo run -- --duration 12
-cargo run -- --acoustid-key YOUR_KEY --duration 15
-```
+## Audio setup
+- **Windows**: loopback works out of the box. Per-app capture needs Windows 10 2004+.
+- **Linux**: pick a `Monitor of ...` source (`pactl list sources | grep monitor`).
+- **macOS**: install BlackHole 2ch and select it as input.
 
-Inside the TUI:
-- `Tab`: switch source (mic / device / app)
-- `↑/↓`: select device/app
-- `r`: record and recognize
-- `o`: open the song page in the browser (cover art is shown inline in the TUI)
-- `l`: continuous listening Loop ON/OFF (or `m-ust --loop-mode`) — skips consecutive repeats of the same song automatically
-- `h`: show last 5 of history (auto-saved to `%APPDATA%\m-ust\history.csv`)
-- `c`: clear log
-- `q`: quit
+## AcoustID fallback (optional)
+1. Get a free client key at https://acoustid.org/new
+2. Pass it via `--acoustid-key` or `M_UST_ACOUSTID_KEY`
+3. Requires `fpcalc` (Chromaprint) next to `m-ust.exe` or in `PATH` — without it, Shazam-only mode works normally
 
-## System audio capture — per OS
-
-### Windows (tested)
-- **System Loopback**: built in via WASAPI loopback — captures exactly what you hear. If it fails, try another output device, or enable `Stereo Mix` in sound settings as a fallback.
-- **Per-App**: via Windows process loopback (requires Windows 10 2004+). Pick `chrome.exe` / `spotify.exe` from the list; only that process is captured (real PID via `IAudioSessionManager2`).
-
-### Linux
-- **System Loopback**: look for a `Monitor of ...` device (PulseAudio/PipeWire). The code auto-detects any input containing `monitor`.
-  ```bash
-  pactl list sources | grep monitor
-  # then select it in the TUI
-  ```
-  With PipeWire + Pulse together you may see `no node available` — remove `pulseaudio` and install `pipewire-pulse`.
-
-### macOS
-- No built-in loopback. Install **BlackHole 2ch**:
-  ```bash
-  brew install blackhole-2ch
-  ```
-  Then create a Multi-Output Device in `Audio MIDI Setup`, select it as output, and `BlackHole` as input in the TUI.
-
-## 100% free — what we used
-
-| Component | License | Cost |
-|-----------|---------|------|
-| `ratatui`, `crossterm`, `cpal`, `rustfft`, `reqwest`, `hound` | MIT/Apache2 | free |
-| `wasapi` (Windows) | MIT | free |
-| Shazam `amp.shazam.com` (unofficial, as used by SongRec) | free, no key | free |
-| AcoustID `api.acoustid.org` | free with free key | free (3 req/s) |
-| MusicBrainz | free | free |
-
-**No AudD, no ACRCloud, no paid keys.**
-
-Getting a free AcoustID key (optional):
-1. Go to https://acoustid.org/new
-2. Register and get a `Client API Key`
-3. Run `m-ust --acoustid-key KEY` or set the `M_UST_ACOUSTID_KEY` env var
-
-> Note: the AcoustID path is fallback-only and requires `fpcalc` (from Chromaprint).
-> Without it the tool works normally via Shazam. Do not commit `fpcalc.exe` to the repo —
-> place it next to `m-ust.exe` or in `PATH`.
-> The config file (`%APPDATA%\m-ust\config.toml`) is never committed (in `.gitignore`).
-
-## Project structure
-
-```
-src/
-  main.rs              # CLI + TUI entry
-  config.rs            # AppConfig (env > file)
-  history.rs           # history.csv save/load
-  audio/
-    capture.rs         # CPAL + WASAPI loopback + process loopback + resample 16k
-    devices.rs         # device + real app-session enumeration
-  fingerprint/
-    shazam.rs          # SignatureGenerator (port of SongRec)
-  api/
-    shazam.rs          # POST to Shazam
-    acoustid.rs        # fallback via fpcalc
-  tui/
-    app.rs             # app state, loop, continuous listening
-    ui.rs              # ratatui rendering
-```
-
-## Roadmap
-- [x] Real WASAPI loopback (`src/audio/capture.rs`)
-- [x] Real PIDs via `IAudioSessionManager2` (no fake names)
-- [x] History in `history.csv` (view with `h`)
-- [x] `fpcalc` integration for real AcoustID (optional, requires `chromaprint`)
-- [x] Continuous listening (`l` or `m-ust --loop-mode`)
-- [ ] In-app update notification (check GitHub Releases)
-
-## Release build
-
-```powershell
-cargo build --release
-.\target\release\m-ust.exe
-```
-
-> Built with Rust 1.98, runs on Windows/Linux/macOS.
+Settings live in `%APPDATA%\m-ust\config.toml` (Windows) or `~/.config/m-ust/config.toml` (Linux) and are never committed.
