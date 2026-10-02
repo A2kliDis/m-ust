@@ -17,7 +17,6 @@ pub struct CapturedAudio {
     pub samples: Vec<i16>, // mono 16kHz
     #[allow(dead_code)]
     pub sample_rate: u32,
-    pub duration_secs: f32,
 }
 
 pub struct AudioCapture {
@@ -99,8 +98,7 @@ impl AudioCapture {
         let raw = buffer.lock().unwrap().clone();
         let mono = downmix_and_resample(&raw, channels, sample_rate, 16000);
         let samples_i16 = finalize_mono(mono);
-        let secs = samples_i16.len() as f32 / 16000.0;
-        Ok(CapturedAudio { samples: samples_i16, sample_rate: 16000, duration_secs: secs })
+        Ok(CapturedAudio { samples: samples_i16, sample_rate: 16000 })
     }
 
     // --- CPAL Monitor (Linux PipeWire/Pulse) ---
@@ -128,7 +126,7 @@ impl AudioCapture {
                     .await
                     .map_err(|e| anyhow!("join: {}", e))?;
                 match res {
-                    Ok(samples) => return Ok(CapturedAudio { samples: samples.clone(), sample_rate: 16000, duration_secs: samples.len() as f32 / 16000.0 }),
+                    Ok(samples) => return Ok(CapturedAudio { samples, sample_rate: 16000 }),
                     Err(_) => {
                         // Per-app failed — fallback to System Loopback
                     }
@@ -140,7 +138,7 @@ impl AudioCapture {
             .await
             .map_err(|e| anyhow!("join: {}", e))?;
         match res {
-            Ok(samples) => Ok(CapturedAudio { samples: samples.clone(), sample_rate: 16000, duration_secs: samples.len() as f32 / 16000.0 }),
+            Ok(samples) => Ok(CapturedAudio { samples, sample_rate: 16000 }),
             Err(e) => {
                 let host = cpal::default_host();
                 if let Ok(devs) = host.input_devices() {
@@ -238,7 +236,7 @@ fn wasapi_loopback_blocking_for_device(device_name: String, duration: Duration) 
     client.start_stream().map_err(|e| anyhow!("start: {}", e))?;
 
     let start = Instant::now();
-    let mut all_f32: Vec<f32> = Vec::with_capacity((samplerate as usize * duration.as_secs() as usize * channels) );
+    let mut all_f32: Vec<f32> = Vec::with_capacity(samplerate as usize * duration.as_secs() as usize * channels);
 
     while start.elapsed() < duration {
         // Wait for data (100ms timeout keeps UI responsive even with silence)
@@ -350,6 +348,11 @@ fn wasapi_process_loopback(pid: u32, duration: Duration) -> Result<Vec<i16>> {
 }
 
 fn save_debug_wav(samples: &[i16], rate: u32) -> Result<()> {
+    // Debug aid only: set M_UST_DEBUG=1 to keep the last capture next to CWD.
+    // Never litter the user's folder by default.
+    if std::env::var("M_UST_DEBUG").as_deref() != Ok("1") {
+        return Ok(());
+    }
     let spec = hound::WavSpec { channels: 1, sample_rate: rate, bits_per_sample: 16, sample_format: hound::SampleFormat::Int };
     let path = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")).join("debug_last.wav");
     let mut w = hound::WavWriter::create(&path, spec)?;

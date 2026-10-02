@@ -22,6 +22,13 @@ pub struct SongInfo {
     pub cover: Option<CoverPixels>,
 }
 
+/// Recorder → UI messages. The cover downloads in the background and
+/// patches the shown result when ready, so recognition never waits on it.
+enum RecEvent {
+    Recognized(Result<SongInfo, String>),
+    CoverReady { seq: u64, cover: CoverPixels },
+}
+
 pub struct App {
     pub config: AppConfig,
     pub status: Status,
@@ -43,6 +50,7 @@ pub struct App {
     pub continuous: bool,
     pub restart_at: Option<Instant>,
     pub history: Vec<HistoryEntry>,
+    record_seq: u64,
 }
 
 impl App {
@@ -87,6 +95,7 @@ impl App {
             continuous: false,
             restart_at: None,
             history,
+            record_seq: 0,
         }
     }
     fn current_mode(&self) -> CaptureMode {
@@ -101,9 +110,11 @@ impl App {
     fn can_record(&self) -> bool {
         self.status == Status::Idle || self.status == Status::Done || self.status == Status::Error
     }
-    fn start_recording(&mut self, tx: &tokio::sync::mpsc::UnboundedSender<Result<SongInfo, String>>) {
+    fn start_recording(&mut self, tx: &tokio::sync::mpsc::UnboundedSender<RecEvent>) {
         if !self.can_record() { return; }
         self.restart_at = None;
+        self.record_seq += 1;
+        let seq = self.record_seq;
         let mode = self.current_mode();
         let secs = self.config.record_duration_secs;
         let cfg = self.config.clone();
@@ -128,12 +139,7 @@ impl App {
                     let sig = generate_shazam_signature(&audio.samples);
                                         match recognize_with_shazam(&sig).await {
                                             Ok(r) => {
-                                                // Cover is decorative: never fail recognition because of it
-                                                let cover = match &r.cover_url {
-                                                    Some(u) => fetch_cover(u).await,
-                                                    None => None,
-                                                };
-                                                Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url, cover_url:r.cover_url, cover})
+                                                Ok(SongInfo{title:r.title, artist:r.artist, album:r.album, url:r.url, cover_url:r.cover_url, cover:None})
                                             },
                         Err(e) => {
                             let msg = e.to_string();
@@ -150,7 +156,14 @@ impl App {
                 },
                 Err(e) => Err(format!("Capture failed: {}", e)),
             };
-            let _ = tx2.send(res);
+            // Show the result immediately; the cover patches in when ready.
+            let cover_url = res.as_ref().ok().and_then(|s| s.cover_url.clone());
+            let _ = tx2.send(RecEvent::Recognized(res));
+            if let Some(u) = cover_url {
+                if let Some(cover) = fetch_cover(&u).await {
+                    let _ = tx2.send(RecEvent::CoverReady { seq, cover });
+                }
+            }
         });
     }
     #[cfg(target_os = "windows")]
@@ -194,7 +207,7 @@ pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut app = App::new(config);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Result<SongInfo, String>>();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<RecEvent>();
     let mut events = crossterm::event::EventStream::new();
     let mut ticker = tokio::time::interval(Duration::from_millis(100));
     if continuous {
@@ -317,9 +330,17 @@ pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
                 }
                 // Live wave for apps tab — updates every 100ms
                 app.update_peaks();
-                while let Ok(res) = rx.try_recv() {
-                    match res {
-                        Ok(song) => {
+                while let Ok(ev) = rx.try_recv() {
+                    match ev {
+                        RecEvent::CoverReady { seq, cover } => {
+                            // Stale covers (user already re-recorded) are dropped
+                            if seq == app.record_seq {
+                                if let Some(song) = app.result.as_mut() {
+                                    song.cover = Some(cover);
+                                }
+                            }
+                        },
+                        RecEvent::Recognized(Ok(song)) => {
                             // Loop-mode dedup: a 30s song spans several 12s windows —
                             // don't spam history with the same (artist, title) twice in a row.
                             let is_repeat = app.continuous && app.history.last().is_some_and(|last| {
@@ -343,7 +364,7 @@ pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
                                 app.restart_at = Some(Instant::now() + Duration::from_secs(3));
                             }
                         },
-                        Err(e) => {
+                        RecEvent::Recognized(Err(e)) => {
                             app.push_log(format!("Failed: {}", e));
                             app.error = Some(e);
                             app.status = Status::Error;

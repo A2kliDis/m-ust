@@ -7,7 +7,6 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use crc32fast::Hasher;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chfft::RFft1D;
-use rustfft::num_complex::Complex;
 
 const DATA_URI_PREFIX: &str = "data:audio/vnd.shazam.sig;base64,";
 
@@ -189,7 +188,7 @@ fn make_signature_from_buffer(buf: &[i16]) -> DecodedSignature {
         }
     }
 
-    let mut sig = DecodedSignature { sample_rate_hz: 16000, number_samples: buf.len() as u32, frequency_band_to_sound_peaks: peaks };
+    let sig = DecodedSignature { sample_rate_hz: 16000, number_samples: buf.len() as u32, frequency_band_to_sound_peaks: peaks };
     // For API we need data_uri, but we keep it lazy via encode_to_uri
     // Add helper field via extension trait: we will compute uri on demand in api layer.
     // To keep ShazamSignature compatible, store uri inside frequency_band_to_sound_peaks? No, compute later.
@@ -198,21 +197,6 @@ fn make_signature_from_buffer(buf: &[i16]) -> DecodedSignature {
     sig
 }
 
-// Helper to get peaks count and uri for old code
-pub trait ShazamExt {
-    fn peaks_len(&self) -> usize;
-    fn data_uri(&self) -> String;
-}
-impl ShazamExt for DecodedSignature {
-    fn peaks_len(&self) -> usize { self.frequency_band_to_sound_peaks.len() }
-    fn data_uri(&self) -> String { self.encode_to_uri().unwrap_or_default() }
-}
-
-// Provide compatibility: allow .peaks and .data_uri field access via Deref hack?
-// Instead, update api to use encode_to_uri directly. For backward compat, expose helpers.
-
-// Legacy alias for older api code: generate returns DecodedSignature which has .frequency_band_to_sound_peaks
-// api will call sig.encode_to_uri().
-
+// Legacy helper kept for external callers; the API layer uses encode_to_uri() directly.
 #[allow(dead_code)]
 pub fn build_shazam_payload(_peaks: &HashMap<u32, Vec<(u32,u32)>>, _samples: u32) -> Vec<u8> { vec![] }
