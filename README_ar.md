@@ -31,6 +31,13 @@ cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 cargo install --path . --bin m-ust   # نسخة محلية
 ```
 
+الحذف (يُبقي الإعدادات والسجل إلا مع purge):
+
+```powershell
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.ps1 | iex
+# curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.sh | bash   # Linux/macOS
+```
+
 ## التشغيل
 
 ```powershell
