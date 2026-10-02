@@ -26,6 +26,18 @@ case "$(uname -s)" in
   Darwin) DATADIR="$HOME/Library/Application Support/$NAME" ;;
   *) DATADIR="${XDG_DATA_HOME:-$HOME/.local/share}/$NAME" ;;
 esac
+if [ "$PURGE" = 0 ]; then
+  # Piped (curl | bash) has no stdin, so ask on the terminal directly if there is one.
+  if [ -t 0 ]; then
+    printf 'Also delete settings + history? [y/N] ' >&2
+    read -r ans || true
+    if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then PURGE=1; fi
+  elif [ -e /dev/tty ]; then
+    printf 'Also delete settings + history? [y/N] ' >/dev/tty 2>&1
+    read -r ans </dev/tty || true
+    if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then PURGE=1; fi
+  fi
+fi
 if [ "$PURGE" = 1 ]; then
   rm -rf "$DATADIR"
   echo "Purged $DATADIR (config + history)."

@@ -33,7 +33,7 @@ cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 cargo install --path . --bin m-ust   # local checkout
 ```
 
-Uninstall (keeps config + history unless purged):
+Uninstall (asks about settings + history):
 
 ```powershell
 irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
