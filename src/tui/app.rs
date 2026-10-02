@@ -297,10 +297,20 @@ pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {
                 while let Ok(res) = rx.try_recv() {
                     match res {
                         Ok(song) => {
-                            app.push_log(format!("{} - {}", song.artist, song.title));
-                            let entry = HistoryEntry::now(song.artist.clone(), song.title.clone(), song.album.clone());
-                            history::append(&entry);
-                            app.history.push(entry);
+                            // Loop-mode dedup: a 30s song spans several 12s windows —
+                            // don't spam history with the same (artist, title) twice in a row.
+                            let is_repeat = app.continuous && app.history.last().is_some_and(|last| {
+                                last.artist.eq_ignore_ascii_case(song.artist.trim())
+                                    && last.title.eq_ignore_ascii_case(song.title.trim())
+                            });
+                            if is_repeat {
+                                app.push_log(format!("Same song, skipped: {} - {}", song.artist, song.title));
+                            } else {
+                                app.push_log(format!("{} - {}", song.artist, song.title));
+                                let entry = HistoryEntry::now(song.artist.clone(), song.title.clone(), song.album.clone());
+                                history::append(&entry);
+                                app.history.push(entry);
+                            }
                             app.result = Some(song);
                             app.status = Status::Done;
                             app.progress = 1.0;
