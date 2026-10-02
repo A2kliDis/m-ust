@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # One-line install for m-ust (Windows):
-#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.ps1 | iex
 $ErrorActionPreference = "Stop"
 $Repo = "A2kliDis/m-ust"
 $Name = "m-ust"

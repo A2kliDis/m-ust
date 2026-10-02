@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Uninstall m-ust (Linux/macOS):
-#   curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash
 # Pass --purge to also delete config + history:
-#   curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.sh | bash -s -- --purge
+#   curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash -s -- --purge
 set -euo pipefail
 NAME="m-ust"
 EXE="${CARGO_HOME:-$HOME/.cargo}/bin/$NAME"

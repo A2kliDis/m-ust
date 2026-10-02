@@ -1,8 +1,8 @@
 #!/usr/bin/env pwsh
 # Uninstall m-ust (Windows):
-#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.ps1 | iex
+#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
 # Add -Purge to also delete config + history:
-#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.ps1 | iex -Purge
+#   irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex -Purge
 param([switch]$Purge)
 $ErrorActionPreference = "Stop"
 $Name = "m-ust"

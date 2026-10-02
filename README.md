@@ -18,12 +18,12 @@ Only anonymous fingerprints are uploaded — no raw audio ever leaves your machi
 
 ```powershell
 # One line (Windows) — prebuilt binary from the latest GitHub Release:
-irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.ps1 | iex
 ```
 
 ```bash
 # One line (Linux/macOS):
-curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.sh | bash
 ```
 
 From source (requires Rust):
@@ -36,8 +36,8 @@ cargo install --path . --bin m-ust   # local checkout
 Uninstall (keeps config + history unless purged):
 
 ```powershell
-irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.ps1 | iex
-# curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.sh | bash   # Linux/macOS
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
+# curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash   # Linux/macOS
 ```
 
 ## Usage

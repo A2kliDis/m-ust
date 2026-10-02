@@ -18,12 +18,12 @@
 
 ```powershell
 # سطر واحد (Windows) — نسخة جاهزة من آخر GitHub Release:
-irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.ps1 | iex
 ```
 
 ```bash
 # سطر واحد (Linux/macOS):
-curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.sh | bash
 ```
 
 من المصدر (يتطلب Rust):
@@ -36,8 +36,8 @@ cargo install --path . --bin m-ust   # نسخة محلية
 الحذف (يُبقي الإعدادات والسجل إلا مع purge):
 
 ```powershell
-irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.ps1 | iex
-# curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/uninstall.sh | bash   # Linux/macOS
+irm https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.ps1 | iex
+# curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/uninstall.sh | bash   # Linux/macOS
 ```
 
 ## التشغيل

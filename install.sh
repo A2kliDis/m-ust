@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-line install for m-ust (Linux/macOS):
-#   curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/A2kliDis/m-ust/master/install.sh | bash
 set -euo pipefail
 REPO="A2kliDis/m-ust"
 NAME="m-ust"
