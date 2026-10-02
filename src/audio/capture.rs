@@ -1,6 +1,7 @@
 //! Audio capture: Microphone + System Loopback + Per-App (Windows)
 use anyhow::{Result, anyhow};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use super::parse_pid;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -96,15 +97,10 @@ impl AudioCapture {
         drop(stream);
 
         let raw = buffer.lock().unwrap().clone();
-        let mut mono = downmix_and_resample(&raw, channels, sample_rate, 16000);
-        let peak = mono.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
-        if peak > 0.001 && peak < 0.5 {
-            let gain = (0.9 / peak).min(8.0);
-            for v in &mut mono { *v *= gain; }
-        }
-        let samples_i16: Vec<i16> = mono.into_iter().map(|f| (f.clamp(-1.0,1.0)*32767.0) as i16).collect();
-        let _ = save_debug_wav(&samples_i16, 16000);
-        Ok(CapturedAudio { samples: samples_i16.clone(), sample_rate: 16000, duration_secs: samples_i16.len() as f32 / 16000.0 })
+        let mono = downmix_and_resample(&raw, channels, sample_rate, 16000);
+        let samples_i16 = finalize_mono(mono);
+        let secs = samples_i16.len() as f32 / 16000.0;
+        Ok(CapturedAudio { samples: samples_i16, sample_rate: 16000, duration_secs: secs })
     }
 
     // --- CPAL Monitor (Linux PipeWire/Pulse) ---
@@ -127,7 +123,7 @@ impl AudioCapture {
         let duration = self.duration;
         // Try per-app process loopback first if app is Some (include child processes - browsers use child pids)
         if let Some(app_str) = app.clone() {
-            if let Some(pid) = Self::parse_pid(&app_str) {
+            if let Some(pid) = parse_pid(&app_str) {
                 let res = tokio::task::spawn_blocking(move || wasapi_process_loopback(pid, duration))
                     .await
                     .map_err(|e| anyhow!("join: {}", e))?;
@@ -162,17 +158,20 @@ impl AudioCapture {
         }
     }
 
-    #[cfg(target_os = "windows")]
-    fn parse_pid(s: &str) -> Option<u32> {
-        // format "chrome.exe (PID 1234)" or "1234"
-        if let Some(start) = s.find("(PID ") {
-            let rest = &s[start+5..];
-            if let Some(end) = rest.find(')') {
-                return rest[..end].trim().parse().ok();
-            }
-        }
-        s.trim().parse().ok()
+}
+
+/// Shared tail for every recorder: auto-gain quiet captures, convert to
+/// mono 16kHz i16, save debug wav. (Was copy-pasted in 3 recorders.)
+fn finalize_mono(mut mono: Vec<f32>) -> Vec<i16> {
+    // Auto-gain: normalize quiet captures (YouTube often at -30dB)
+    let peak = mono.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
+    if peak > 0.001 && peak < 0.5 {
+        let gain = (0.9 / peak).min(8.0); // max 18dB boost to avoid noise explosion
+        for v in &mut mono { *v *= gain; }
     }
+    let out: Vec<i16> = mono.into_iter().map(|f| (f.clamp(-1.0,1.0)*32767.0) as i16).collect();
+    let _ = save_debug_wav(&out, 16000);
+    out
 }
 
 fn downmix_and_resample(input: &[f32], channels: usize, from_rate: u32, to_rate: u32) -> Vec<f32> {
@@ -300,16 +299,8 @@ fn wasapi_loopback_blocking_for_device(device_name: String, duration: Duration) 
     }
 
     // Downmix to mono + resample to 16k for Shazam
-    let mut mono = downmix_and_resample(&all_f32, channels, samplerate, 16000);
-    // Auto-gain: normalize quiet loopback captures (YouTube often at -30dB)
-    let peak = mono.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
-    if peak > 0.001 && peak < 0.5 {
-        let gain = (0.9 / peak).min(8.0); // max 18dB boost to avoid noise explosion
-        for v in &mut mono { *v *= gain; }
-    }
-    let out: Vec<i16> = mono.into_iter().map(|f| (f.clamp(-1.0,1.0)*32767.0) as i16).collect();
-    let _ = save_debug_wav(&out, 16000);
-    Ok(out)
+    let mono = downmix_and_resample(&all_f32, channels, samplerate, 16000);
+    Ok(finalize_mono(mono))
 }
 
 #[cfg(target_os = "windows")]
@@ -354,12 +345,8 @@ fn wasapi_process_loopback(pid: u32, duration: Duration) -> Result<Vec<i16>> {
     }
     client.stop_stream().ok();
     if all_f32.is_empty() { anyhow::bail!("no audio from PID {} — is it playing?", pid); }
-    let mut mono = downmix_and_resample(&all_f32, 2, 48000, 16000);
-    let peak = mono.iter().map(|v| v.abs()).fold(0.0, f32::max);
-    if peak > 0.001 && peak < 0.5 { let g=(0.9/peak).min(8.0); for v in &mut mono {*v*=g;} }
-    let out: Vec<i16> = mono.into_iter().map(|f| (f.clamp(-1.0,1.0)*32767.0) as i16).collect();
-    let _ = save_debug_wav(&out, 16000);
-    Ok(out)
+    let mono = downmix_and_resample(&all_f32, 2, 48000, 16000);
+    Ok(finalize_mono(mono))
 }
 
 fn save_debug_wav(samples: &[i16], rate: u32) -> Result<()> {

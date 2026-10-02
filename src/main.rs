@@ -22,7 +22,7 @@ struct Args {
 
     /// AcoustID API key (optional, for free fallback).
     /// Also read from env M_UST_ACOUSTID_KEY (or ACOUSTID_KEY). CLI wins over env, env wins over config file.
-    #[arg(long, env = "M_UST_ACOUSTID_KEY")]
+    #[arg(long)]
     acoustid_key: Option<String>,
 
     /// Start in continuous listening mode (like `songrec listen`)

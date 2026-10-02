@@ -7,9 +7,7 @@ use crossterm::{
 use futures::StreamExt;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{time::{Duration, Instant}, io};
-use crate::{config::AppConfig, history::{self, HistoryEntry}, audio::{CaptureMode, AudioCapture, list_input_devices, list_output_devices, list_app_sessions}, fingerprint::generate_shazam_signature, api::{recognize_with_shazam, recognize_with_acoustid, fetch_cover, CoverPixels}};
-#[cfg(target_os = "windows")]
-use crate::audio::get_peak_for_pid;
+use crate::{config::AppConfig, history::{self, HistoryEntry}, audio::{CaptureMode, AudioCapture, list_input_devices, list_output_devices, list_app_sessions, parse_pid, session_peaks}, fingerprint::generate_shazam_signature, api::{recognize_with_shazam, recognize_with_acoustid, fetch_cover, CoverPixels}};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status { Idle, Recording, Identifying, Done, Error }
@@ -162,13 +160,12 @@ impl App {
         if self.app_peaks.len() != self.apps.len() {
             self.app_peaks = vec![0.0; self.apps.len()];
         }
+        // One enumeration for all apps (was: one full COM pass per app)
+        let peaks = session_peaks();
         for (i, app_str) in self.apps.iter().enumerate() {
-            if let Some(pid) = parse_pid(app_str) {
-                let peak = get_peak_for_pid(pid);
-                self.app_peaks[i] = peak;
-            } else {
-                self.app_peaks[i] = 0.0;
-            }
+            self.app_peaks[i] = parse_pid(app_str)
+                .and_then(|pid| peaks.get(&pid).copied())
+                .unwrap_or(0.0);
         }
     }
     #[cfg(not(target_os = "windows"))]
@@ -188,16 +185,6 @@ fn open_in_browser(url: &str) {
     {
         let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     }
-}
-
-fn parse_pid(s: &str) -> Option<u32> {
-    if let Some(start) = s.find("(PID ") {
-        let rest = &s[start+5..];
-        if let Some(end) = rest.find(')') {
-            return rest[..end].trim().parse().ok();
-        }
-    }
-    s.trim().parse().ok()
 }
 
 pub async fn run(config: AppConfig, continuous: bool) -> Result<()> {

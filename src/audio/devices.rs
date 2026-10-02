@@ -74,6 +74,18 @@ pub fn list_loopback_devices() -> Vec<AudioDeviceInfo> {
     v
 }
 
+/// Parse a PID from `"chrome.exe (PID 1234)"` or plain `"1234"`.
+/// Single copy — used by capture, TUI peaks, and debug bins.
+pub fn parse_pid(s: &str) -> Option<u32> {
+    if let Some(start) = s.find("(PID ") {
+        let rest = &s[start+5..];
+        if let Some(end) = rest.find(')') {
+            return rest[..end].trim().parse().ok();
+        }
+    }
+    s.trim().parse().ok()
+}
+
 /// List per-app audio sessions (Windows only, via WASAPI Audio Sessions)
 #[cfg(target_os = "windows")]
 pub fn list_app_sessions() -> Vec<String> {
@@ -139,37 +151,44 @@ fn try_list_sessions_wasapi() -> anyhow::Result<Vec<String>> {
     Ok(out)
 }
 
+/// One WASAPI pass: pid -> live peak for every session.
+/// The TUI calls this once per tick instead of one full enumeration
+/// per app (was N+1 COM queries every 100ms).
 #[cfg(target_os = "windows")]
-pub fn get_peak_for_pid(target_pid: u32) -> f32 {
+pub fn session_peaks() -> std::collections::HashMap<u32, f32> {
     use windows::Win32::Media::Audio::{MMDeviceEnumerator, IMMDeviceEnumerator, eRender, eConsole, IAudioSessionManager2};
     use windows::Win32::Media::Audio::Endpoints::IAudioMeterInformation;
     use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, COINIT_MULTITHREADED, CoInitializeEx};
     use windows::core::Interface;
+    let mut map = std::collections::HashMap::new();
     unsafe { let _ = CoInitializeEx(None, COINIT_MULTITHREADED); }
     let enumerator: Result<IMMDeviceEnumerator, _> = unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) };
-    let enumerator = match enumerator { Ok(e) => e, Err(_) => return 0.0 };
-    let device = match unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) } { Ok(d) => d, Err(_) => return 0.0 };
+    let enumerator = match enumerator { Ok(e) => e, Err(_) => return map };
+    let device = match unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) } { Ok(d) => d, Err(_) => return map };
     let mgr: Result<IAudioSessionManager2, _> = unsafe { device.Activate(CLSCTX_ALL, None) };
-    let mgr = match mgr { Ok(m) => m, Err(_) => return 0.0 };
-    let session_enum = match unsafe { mgr.GetSessionEnumerator() } { Ok(s) => s, Err(_) => return 0.0 };
+    let mgr = match mgr { Ok(m) => m, Err(_) => return map };
+    let session_enum = match unsafe { mgr.GetSessionEnumerator() } { Ok(s) => s, Err(_) => return map };
     let count = unsafe { session_enum.GetCount().unwrap_or(0) };
-    let mut max_peak: f32 = 0.0;
-    let mut found = false;
     for i in 0..count {
         let ctrl = match unsafe { session_enum.GetSession(i) } { Ok(c) => c, Err(_) => continue };
         use windows::Win32::Media::Audio::IAudioSessionControl2;
         let ctrl2: Result<IAudioSessionControl2, _> = ctrl.cast();
         let ctrl2 = match ctrl2 { Ok(c) => c, Err(_) => continue };
         let pid = unsafe { ctrl2.GetProcessId().unwrap_or(0) };
-        if pid != target_pid { continue; }
-        found = true;
+        if pid == 0 { continue; }
         // Try per-session meter (IAudioMeterInformation on the session)
         let meter: Result<IAudioMeterInformation, _> = ctrl.cast();
         let meter2: Result<IAudioMeterInformation, _> = ctrl2.cast();
         let peak = if let Ok(m) = meter { unsafe { m.GetPeakValue().unwrap_or(0.0) } } else { 0.0 };
         let peak2 = if let Ok(m) = meter2 { unsafe { m.GetPeakValue().unwrap_or(0.0) } } else { 0.0 };
+        let entry = map.entry(pid).or_insert(0.0);
         let p = peak.max(peak2);
-        if p > max_peak { max_peak = p; }
+        if p > *entry { *entry = p; }
     }
-    if found { max_peak } else { 0.0 }
+    map
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn session_peaks() -> std::collections::HashMap<u32, f32> {
+    std::collections::HashMap::new()
 }
