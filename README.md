@@ -1,18 +1,20 @@
-# M-ust — TUI للتعرف على الأغاني من صوت الجهاز (Rust 100%)
+# M-ust — Song recognizer TUI (100% Rust)
 
-> بناء كامل بـ Rust • مجاني 100% • يلتقط صوت الجهاز أو تطبيق محدد
+> Fully built in Rust • 100% free • captures system audio or a specific app
+>
+> English | [العربية](README_ar.md)
 
-## المميزات
-- **TUI بـ ratatui** : واجهة نصية سريعة، تختار المصدر وتضغط `r`
-- **ثلاث أوضاع التقاط**:
-  1. 🎤 مايكروفون (CPAL)
-  2. 🔊 صوت الجهاز Loopback — كل ما يخرج من السماعات
-  3. 🎯 تطبيق محدد (Windows Process Loopback)
-- **بصمة Shazam نقية Rust** : `rustfft` + خوارزمية Wang 2003 (مثل SongRec) — بدون مكتبات C
-- **مجاني 100%** : يرسل البصمة فقط (peaks) إلى `amp.shazam.com` — لا يحتاج مفتاح، لا يرسل صوت خام
-- **Fallback AcoustID** : اختياري إذا فشل Shazam، بمفتاح مجاني من `acoustid.org`
+## Features
+- **ratatui TUI**: fast text UI — pick a source and press `r`
+- **Three capture modes**:
+  1. 🎤 Microphone (CPAL)
+  2. 🔊 System audio loopback — everything coming out of the speakers
+  3. 🎯 Specific app (Windows process loopback)
+- **Pure-Rust Shazam fingerprint**: `rustfft` + Wang 2003 algorithm (like SongRec) — no C libraries
+- **100% free**: sends only the fingerprint (peaks) to `amp.shazam.com` — no key needed, no raw audio uploaded
+- **AcoustID fallback**: optional if Shazam fails, with a free key from `acoustid.org`
 
-## كيف يعمل؟
+## How it works
 
 ```
 [ CPAL / WASAPI Loopback ] -> mono 16kHz (downmix+resample)
@@ -22,125 +24,120 @@
 [ POST https://amp.shazam.com/discovery/v5/... ] -> JSON {title, artist, album, url}
 ```
 
-البصمة = قائمة قمم ترددية `(freq, time)` فقط، لا يمكن إعادة بناء الصوت منها. الخصوصية محفوظة.
+The fingerprint is just a list of spectral peaks `(freq, time)` — audio cannot be reconstructed from it. Privacy preserved.
 
-## التثبيت
+## Install
 
 ```powershell
-# من المصدر (يتطلب Rust)
+# From source (requires Rust)
 cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 
-# أو محلياً
+# Or locally
 cargo install --path . --bin m-ust
 ```
 
-## التشغيل
+## Usage
 
 ```powershell
-m-ust                    # مدة افتراضية 12 ثانية
+m-ust                    # default 12 seconds
 m-ust --duration 12
 m-ust --acoustid-key YOUR_KEY --duration 15
-# أو عبر متغير البيئة (لا يُحفظ في ملف الإعدادات):
+# Or via env var (never written to the config file):
 $env:M_UST_ACOUSTID_KEY="YOUR_KEY"; m-ust
 ```
 
-للتطوير:
+For development:
 
 ```powershell
-cargo run              # مدة افتراضية 12 ثانية
 cargo run -- --duration 12
 cargo run -- --acoustid-key YOUR_KEY --duration 15
 ```
 
-داخل TUI:
-- `Tab` : تبديل المصدر (مايكروفون / جهاز / تطبيق)
-- `↑/↓` : اختيار جهاز/تطبيق
-- `r` : تسجيل وتعرف
-- `l` : وضع الاستماع المستمر Loop ON/OFF (أو `m-ust --loop-mode`) — يتخطى تكرار نفس الأغنية المتتالية تلقائياً
-- `h` : عرض آخر 5 من السجل (يُحفظ تلقائياً في `%APPDATA%\m-ust\history.csv`)
-- `c` : مسح السجل
-- `q` : خروج
+Inside the TUI:
+- `Tab`: switch source (mic / device / app)
+- `↑/↓`: select device/app
+- `r`: record and recognize
+- `l`: continuous listening Loop ON/OFF (or `m-ust --loop-mode`) — skips consecutive repeats of the same song automatically
+- `h`: show last 5 of history (auto-saved to `%APPDATA%\m-ust\history.csv`)
+- `c`: clear log
+- `q`: quit
 
-## التقاط صوت الجهاز — حسب النظام
+## System audio capture — per OS
 
-### Windows (مُختبر)
-- **System Loopback**: يحتاج WASAPI loopback. في هذا المشروع الـ MVP يستخدم CPAL fallback (مايكروفون) مع رسالة توجيهية. للـ loopback الكامل ثبّت `VB-Audio Virtual Cable` أو فعّل `Stereo Mix` من إعدادات الصوت، أو حدّث `src/audio/capture.rs` لاستخدام `wasapi` 0.15 API الكامل:
-  ```rust
-  // مثال wasapi 0.15: DeviceCollection::new(&Direction::Render)?.get_default_device() -> يختلف حسب الإصدار
-  // Process Loopback يتطلب Windows 10 2004+ و PID:
-  // audio_client.initialize_client_for_process_loopback(pid)
-  ```
-- **Per-App**: نفس WASAPI لكن مع `PROCESS_LOOPBACK_PARAMS`. اختر `chrome.exe` / `spotify.exe` من القائمة، والكود سيحاول التقاط تلك العملية فقط. يحتاج PID (يمكن جلبه عبر `tasklist`).
+### Windows (tested)
+- **System Loopback**: built in via WASAPI loopback — captures exactly what you hear. If it fails, try another output device, or enable `Stereo Mix` in sound settings as a fallback.
+- **Per-App**: via Windows process loopback (requires Windows 10 2004+). Pick `chrome.exe` / `spotify.exe` from the list; only that process is captured (real PID via `IAudioSessionManager2`).
 
 ### Linux
-- **System Loopback**: ابحث عن جهاز `Monitor of ...` (PulseAudio/PipeWire). الكود يبحث تلقائياً عن أي input يحتوي `monitor`.
+- **System Loopback**: look for a `Monitor of ...` device (PulseAudio/PipeWire). The code auto-detects any input containing `monitor`.
   ```bash
   pactl list sources | grep monitor
-  # ثم اختره من TUI
+  # then select it in the TUI
   ```
-  إذا كان لديك PipeWire + Pulse معاً قد ترى `no node available` — احذف `pulseaudio` وثبّت `pipewire-pulse`.
+  With PipeWire + Pulse together you may see `no node available` — remove `pulseaudio` and install `pipewire-pulse`.
 
 ### macOS
-- لا يوجد loopback افتراضي. ثبّت **BlackHole 2ch**:
+- No built-in loopback. Install **BlackHole 2ch**:
   ```bash
   brew install blackhole-2ch
   ```
-  ثم أنشئ Multi-Output Device في `Audio MIDI Setup` واختره كـ output، و `BlackHole` كـ input في TUI.
+  Then create a Multi-Output Device in `Audio MIDI Setup`, select it as output, and `BlackHole` as input in the TUI.
 
-## مجاني 100% — ماذا استخدمنا؟
+## 100% free — what we used
 
-| المكون | الترخيص | التكلفة |
-|--------|---------|---------|
-| `ratatui`, `crossterm`, `cpal`, `rustfft`, `reqwest`, `hound` | MIT/Apache2 | مجاني |
-| `wasapi` (Windows) | MIT | مجاني |
-| Shazam `amp.shazam.com` (غير رسمي، مستخدم في SongRec) | مجاني بدون مفتاح | مجاني |
-| AcoustID `api.acoustid.org` | مجاني بمفتاح مجاني | مجاني (3 req/s) |
-| MusicBrainz | مجاني | مجاني |
+| Component | License | Cost |
+|-----------|---------|------|
+| `ratatui`, `crossterm`, `cpal`, `rustfft`, `reqwest`, `hound` | MIT/Apache2 | free |
+| `wasapi` (Windows) | MIT | free |
+| Shazam `amp.shazam.com` (unofficial, as used by SongRec) | free, no key | free |
+| AcoustID `api.acoustid.org` | free with free key | free (3 req/s) |
+| MusicBrainz | free | free |
 
-**لا AudD، لا ACRCloud، لا مفاتيح مدفوعة.**
+**No AudD, no ACRCloud, no paid keys.**
 
-للحصول على مفتاح AcoustID المجاني (اختياري):
-1. ادخل https://acoustid.org/new
-2. سجل واحصل على `Client API Key`
-3. شغّل `m-ust --acoustid-key KEY` أو احفظه في متغير البيئة `M_UST_ACOUSTID_KEY`
+Getting a free AcoustID key (optional):
+1. Go to https://acoustid.org/new
+2. Register and get a `Client API Key`
+3. Run `m-ust --acoustid-key KEY` or set the `M_UST_ACOUSTID_KEY` env var
 
-> ملاحظة: مسار AcoustID احتياطي فقط ويتطلب `fpcalc` (من Chromaprint).
-> بدونه الأداة تعمل طبيعياً عبر Shazam. لا ترفع `fpcalc.exe` للريبو —
-> ضعه بجانب `m-ust.exe` أو في `PATH`.
-> ملف الإعدادات (`%APPDATA%\m-ust\config.toml`) لا يُرفع أبداً (في `.gitignore`).
+> Note: the AcoustID path is fallback-only and requires `fpcalc` (from Chromaprint).
+> Without it the tool works normally via Shazam. Do not commit `fpcalc.exe` to the repo —
+> place it next to `m-ust.exe` or in `PATH`.
+> The config file (`%APPDATA%\m-ust\config.toml`) is never committed (in `.gitignore`).
 
-## هيكل المشروع
+## Project structure
 
 ```
 src/
-  main.rs              # CLI + تشغيل TUI
-  config.rs            # AppConfig
+  main.rs              # CLI + TUI entry
+  config.rs            # AppConfig (env > file)
+  history.rs           # history.csv save/load
   audio/
-    capture.rs         # CPAL + WASAPI stub + resample 16k
-    devices.rs         # سرد الأجهزة والتطبيقات
+    capture.rs         # CPAL + WASAPI loopback + process loopback + resample 16k
+    devices.rs         # device + real app-session enumeration
   fingerprint/
-    shazam.rs          # SignatureGenerator (Port من SongRec)
+    shazam.rs          # SignatureGenerator (port of SongRec)
   api/
-    shazam.rs          # POST إلى Shazam
-    acoustid.rs        # fallback
+    shazam.rs          # POST to Shazam
+    acoustid.rs        # fallback via fpcalc
   tui/
-    app.rs             # حالة التطبيق والـ loop
-    ui.rs              # رسم ratatui
+    app.rs             # app state, loop, continuous listening
+    ui.rs              # ratatui rendering
 ```
 
-## تطوير إضافي مقترح
-- [x] تفعيل WASAPI loopback الحقيقي (`src/audio/capture.rs`)
-- [x] سرد PID الحقيقي عبر `IAudioSessionManager2` (بدون أسماء وهمية)
-- [x] حفظ السجل في `history.csv` (يُعرض بزر `h`)
-- [x] `fpcalc` integration للـ AcoustID الحقيقي (اختياري، يتطلب `chromaprint`)
-- [x] وضع Continuous listening (`l` أو `m-ust --loop-mode`)
-- [ ] تنبيه التحديثات من داخل الأداة (فحص GitHub Releases)
+## Roadmap
+- [x] Real WASAPI loopback (`src/audio/capture.rs`)
+- [x] Real PIDs via `IAudioSessionManager2` (no fake names)
+- [x] History in `history.csv` (view with `h`)
+- [x] `fpcalc` integration for real AcoustID (optional, requires `chromaprint`)
+- [x] Continuous listening (`l` or `m-ust --loop-mode`)
+- [ ] In-app update notification (check GitHub Releases)
 
-## بناء release
+## Release build
 
 ```powershell
 cargo build --release
 .\target\release\m-ust.exe
 ```
 
-> تم بناؤه بـ Rust 1.98، يعمل على Windows/Linux/macOS.
+> Built with Rust 1.98, runs on Windows/Linux/macOS.

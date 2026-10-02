@@ -1,4 +1,4 @@
-//! سرد الأجهزة والتطبيقات
+//! Device and app enumeration
 use anyhow::Result;
 
 #[derive(Clone, Debug)]
@@ -58,28 +58,28 @@ pub fn list_output_devices() -> Vec<AudioDeviceInfo> {
 
 #[allow(dead_code)]
 pub fn list_loopback_devices() -> Vec<AudioDeviceInfo> {
-    // نجمع كل الأجهزة ونميز الـ monitor
+    // Collect all devices and flag the monitor ones
     let mut v = list_input_devices().unwrap_or_default();
-    // على Windows: نضيف أجهزة الـ loopback الافتراضية
+    // On Windows: add the default loopback devices
     #[cfg(target_os = "windows")]
     {
-        // WASAPI loopback devices تظهر كـ render devices
+        // WASAPI loopback devices appear as render devices
         
         if let Ok(host) = std::panic::catch_unwind(|| cpal::default_host()) {
             let _ = host;
         }
-        // سنضيف عنصر وهمي يمثل System Audio
+        // Add a virtual entry representing System Audio
         v.push(AudioDeviceInfo { name: "System Audio (WASAPI Loopback)".into(), is_loopback: true, is_monitor: true });
     }
     v
 }
 
-/// سرد جلسات الصوت للتطبيقات (Windows فقط عبر WASAPI Audio Sessions)
+/// List per-app audio sessions (Windows only, via WASAPI Audio Sessions)
 #[cfg(target_os = "windows")]
 pub fn list_app_sessions() -> Vec<String> {
-    // نستخدم wasapi لسرد العمليات التي تصدر صوتاً
-    // هذا يعتمد على WASAPI session enumeration
-    // للتبسيط نعيد قائمة فارغة إذا فشل، والتطبيق سيعمل بـ loopback عام
+    // Use wasapi to enumerate processes currently emitting audio.
+    // Based on WASAPI session enumeration.
+    // On failure return empty; the app falls back to system-wide loopback.
     match try_list_sessions_wasapi() {
         Ok(v) => v,
         Err(_) => vec![],
@@ -88,7 +88,7 @@ pub fn list_app_sessions() -> Vec<String> {
 
 #[cfg(not(target_os = "windows"))]
 pub fn list_app_sessions() -> Vec<String> {
-    // على Linux: يمكن سرد عملاء PulseAudio عبر `pactl list clients` لكن نتركه فارغ للـ MVP
+    // On Linux: PulseAudio clients could be listed via `pactl list clients`, left empty for MVP
     vec![]
 }
 
