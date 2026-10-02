@@ -33,9 +33,6 @@ cargo install --git https://github.com/A2kliDis/m-ust --bin m-ust
 cargo install --path . --bin m-ust   # local checkout
 ```
 
-Linux needs the ALSA runtime lib once: `sudo apt install -y libasound2`
-(`alsa-lib` on Fedora/Arch).
-
 Uninstall (asks about settings + history):
 
 ```powershell
