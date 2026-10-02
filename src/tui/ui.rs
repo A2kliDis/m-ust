@@ -180,11 +180,17 @@ pub fn draw(f: &mut Frame, app: &App) {
         f.render_widget(log_block, cols[1]);
     }
 
-    // Footer — single minimal help line
+    // Footer — contextual: `o` appears only while a song result is shown
     let loop_style = if app.continuous { Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD) } else { Style::default().fg(Color::White).add_modifier(Modifier::BOLD) };
     let loop_label = if app.continuous { " loop:ON  " } else { " loop  " };
-    let footer = Paragraph::new(Line::from(vec![
+    let mut footer_spans = vec![
         Span::styled(" r", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)), Span::styled(" record  ", Style::default().fg(Color::DarkGray)),
+    ];
+    if app.result.is_some() {
+        footer_spans.push(Span::styled("o", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)));
+        footer_spans.push(Span::styled(" open  ", Style::default().fg(Color::DarkGray)));
+    }
+    footer_spans.extend(vec![
         Span::styled(" l", loop_style), Span::styled(loop_label, Style::default().fg(Color::DarkGray)),
         Span::styled("h", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)), Span::styled(" history  ", Style::default().fg(Color::DarkGray)),
         Span::styled("Tab", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)), Span::styled(" switch  ", Style::default().fg(Color::DarkGray)),
@@ -192,6 +198,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         Span::styled("g", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)), Span::styled(" refresh  ", Style::default().fg(Color::DarkGray)),
         Span::styled("d", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)), Span::styled(" default  ", Style::default().fg(Color::DarkGray)),
         Span::styled("q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)), Span::styled(" quit", Style::default().fg(Color::DarkGray)),
-    ])).alignment(Alignment::Center);
+    ]);
+    let footer = Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center);
     f.render_widget(footer, chunks[4]);
 }
