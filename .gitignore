@@ -1,0 +1,6 @@
+/target
+*.wav
+fpcalc.exe
+fpcalc
+config.toml
+debug_last.wav
