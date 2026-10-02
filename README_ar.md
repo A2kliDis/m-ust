@@ -15,8 +15,7 @@
 ## التثبيت
 
 ```powershell
-# سطر واحد (Windows) — نسخة جاهزة من آخر GitHub Release،
-# ويرجع لـ cargo إذا لا يوجد إصدار بعد:
+# سطر واحد (Windows) — نسخة جاهزة من آخر GitHub Release:
 irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
 ```
 
@@ -55,6 +54,3 @@ $env:M_UST_ACOUSTID_KEY="YOUR_KEY"; m-ust   # نفس الشيء دون حفظ ع
 3. يحتاج `fpcalc` (Chromaprint) بجانب `m-ust.exe` أو في `PATH` — بدونه يعمل وضع Shazam طبيعياً
 
 الإعدادات في `%APPDATA%\m-ust\config.toml` (Windows) أو `~/.config/m-ust/config.toml` (Linux) ولا تُرفع أبداً.
-
-## القادم
-- [ ] تنبيه التحديثات من داخل الأداة (فحص GitHub Releases)

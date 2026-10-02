@@ -15,8 +15,7 @@ Only anonymous fingerprints are uploaded — no raw audio ever leaves your machi
 ## Install
 
 ```powershell
-# One line (Windows) — prebuilt binary from the latest GitHub Release,
-# falls back to cargo if no release exists yet:
+# One line (Windows) — prebuilt binary from the latest GitHub Release:
 irm https://raw.githubusercontent.com/A2kliDis/m-ust/main/install.ps1 | iex
 ```
 
@@ -55,6 +54,3 @@ Keys inside the TUI: `Tab` switch source • `↑/↓` select • `r` record •
 3. Requires `fpcalc` (Chromaprint) next to `m-ust.exe` or in `PATH` — without it, Shazam-only mode works normally
 
 Settings live in `%APPDATA%\m-ust\config.toml` (Windows) or `~/.config/m-ust/config.toml` (Linux) and are never committed.
-
-## Roadmap
-- [ ] In-app update notification (checks GitHub Releases)
